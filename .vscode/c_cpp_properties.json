@@ -1,0 +1,66 @@
+{
+        "configurations": [
+                {
+                        "name": "Linux",
+                        "includePath": [
+                                "${workspaceRoot}/include",
+                                "${workspaceRoot}/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include",
+                                "${workspaceRoot}/include/arch/arm64/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include/generated",
+                                "${workspaceRoot}/include/arch/arm64/include/generated/uapi",
+
+                                "${workspaceRoot}/aarch64-linux-gnu/include"
+                        ],
+                        "defines": [
+                                "__GUNC__",
+                                "__KERNEL__"
+                        ],
+                        "forcedInclude": [
+                                "${workspaceRoot}/include/generated/autoconf.h"
+                        ]
+                },
+                {
+                        "name": "Win32",
+                        "includePath": [
+                                "${workspaceRoot}/include",
+                                "${workspaceRoot}/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include",
+                                "${workspaceRoot}/include/arch/arm64/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include/generated",
+                                "${workspaceRoot}/include/arch/arm64/include/generated/uapi",
+
+                                "${workspaceRoot}/aarch64-linux-gnu/include"
+                        ],
+                        "defines": [
+                                "__GUNC__",
+                                "__KERNEL__"
+                        ],
+                        "forcedInclude": [
+                                "${workspaceRoot}/include/generated/autoconf.h"
+                        ]
+                },
+                {
+                        "name": "Mac",
+                        "includePath": [
+                                "${workspaceRoot}/include",
+                                "${workspaceRoot}/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include",
+                                "${workspaceRoot}/include/arch/arm64/include/uapi",
+                                "${workspaceRoot}/include/arch/arm64/include/generated",
+                                "${workspaceRoot}/include/arch/arm64/include/generated/uapi",
+
+                                "${workspaceRoot}/aarch64-linux-gnu/include"
+                        ],
+                        "defines": [
+                                "__GUNC__",
+                                "__KERNEL__"
+                        ],
+                        "forcedInclude": [
+                                "${workspaceRoot}/include/generated/autoconf.h"
+                        ]
+                }
+
+        ],
+        "version": 4
+}

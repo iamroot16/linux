@@ -1,0 +1,8 @@
+{
+    "editor.tabSize": 8,
+    "git.enabled": false,
+    "C_Cpp.autocomplete": "Disabled",
+    "C_Cpp.errorSquiggles": "Disabled",
+    "editor.minimap.enabled": false,
+    "files.autoSave": "off"
+}
