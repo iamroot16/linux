@@ -85,3 +85,4 @@ $ make gtags
 
   https://github.com/iamroot16a/study/tree/master/.vscode
 
+https://join.slack.com/t/iamroot16/shared_invite/enQtODM1MDkzMjkyMDAzLWYwNWU4NzQ0NmY5Y2IyZTYxMWRiNjdiNDkxYmViZmFlNDZjMTkyOTkxMjU2NzY5MTY1NTQyZDQ5YmE3YjlmMmE
