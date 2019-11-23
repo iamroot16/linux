@@ -172,6 +172,9 @@
 )
 
 
+/*
+ * A value of 0 yields the return address of the current function, a value of 1 yields the return address of the caller of the current function
+ */
 #define _RET_IP_		(unsigned long)__builtin_return_address(0)
 #define _THIS_IP_  ({ __label__ __here; __here: (unsigned long)&&__here; })
 

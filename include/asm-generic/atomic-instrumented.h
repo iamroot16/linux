@@ -1320,6 +1320,11 @@ atomic64_fetch_andnot_relaxed(s64 i, atomic64_t *v)
 #define atomic64_fetch_andnot_relaxed atomic64_fetch_andnot_relaxed
 #endif
 
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * i = 1 (i의 뜻은 인덱스를 의미하는것으로 추정)
+ * v = cpumask 의 주소 &(unsigned long bits[0])
+ */
 static inline void
 atomic64_or(s64 i, atomic64_t *v)
 {

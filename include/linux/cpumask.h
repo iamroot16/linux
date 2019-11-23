@@ -306,6 +306,11 @@ extern int cpumask_next_wrap(int n, const struct cpumask *mask, int start, bool 
  * @cpu: cpu number (< nr_cpu_ids)
  * @dstp: the cpumask pointer
  */
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * cpu = 0 
+ * dstp = cpumask 의 주소 &(unsigned long bits[2])
+ */
 static inline void cpumask_set_cpu(unsigned int cpu, struct cpumask *dstp)
 {
 	set_bit(cpumask_check(cpu), cpumask_bits(dstp));
@@ -806,6 +811,23 @@ set_cpu_present(unsigned int cpu, bool present)
 		cpumask_clear_cpu(cpu, &__cpu_present_mask);
 }
 
+/*
+ * arg
+ * cpu = 0
+ * online = true
+ */
+
+/*
+ * struct cpumask { DECLARE_BITMAP(bits, NR_CPUS); }
+ * #define DECLARE_BITMAP(name,bits) unsigned long name[BITS_TO_LONGS(bits)]
+ */
+
+/*
+ * 해당 코드에서 NR_CPUS = 65로 가정하면
+ * struct cpumask는 unsinged long bits[BITS_TO_LONGS(65)] 가 되고
+ * 다시 풀어쓰면 
+ * struct cpumask는 unsigned long bits[2]가 됨.
+ */
 static inline void
 set_cpu_online(unsigned int cpu, bool online)
 {
