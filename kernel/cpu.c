@@ -2252,6 +2252,9 @@ struct cpumask __cpu_possible_mask __read_mostly;
 #endif
 EXPORT_SYMBOL(__cpu_possible_mask);
 
+/*
+ * #define __read_mostly __attribute__((__section__(".data..read_mostly")))
+ */
 struct cpumask __cpu_online_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_online_mask);
 
@@ -2284,6 +2287,9 @@ void __init boot_cpu_init(void)
 	int cpu = smp_processor_id();
 
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
+    /*
+     * cpu 값이 0이라고 가정하고 코드를 리뷰.
+     */
 	set_cpu_online(cpu, true);
 	set_cpu_active(cpu, true);
 	set_cpu_present(cpu, true);

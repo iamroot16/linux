@@ -321,7 +321,11 @@ atomic_long_fetch_andnot_relaxed(long i, atomic_long_t *v)
 {
 	return atomic64_fetch_andnot_relaxed(i, v);
 }
-
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * i = 1 (i의 뜻은 인덱스를 의미하는것으로 추정)
+ * v = cpumask 의 주소 &(unsigned long bits[0])
+ */
 static inline void
 atomic_long_or(long i, atomic_long_t *v)
 {

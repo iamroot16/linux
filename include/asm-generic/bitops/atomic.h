@@ -11,6 +11,14 @@
  * See Documentation/atomic_bitops.txt for details.
  */
 
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * nr = 0
+ * p = cpumask 의 주소 &(unsigned long bits[2])
+ */
+/*
+ * nr 값이 0일 경우, BIT_MASK를 거치면 1이 됨.
+ */
 static inline void set_bit(unsigned int nr, volatile unsigned long *p)
 {
 	p += BIT_WORD(nr);

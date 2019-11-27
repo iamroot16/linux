@@ -13,8 +13,21 @@
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
+
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * nr = 0
+ * addr = cpumask 의 주소 &(unsigned long bits[2])
+ */
+/*
+ * nr 값이 0일 경우, BIT_MASK를 거치면 1이 됨.
+ */
 static inline void __set_bit(int nr, volatile unsigned long *addr)
 {
+    /*
+     * mask = 1
+     * p = &(unsigned long bits[0])
+     */
 	unsigned long mask = BIT_MASK(nr);
 	unsigned long *p = ((unsigned long *)addr) + BIT_WORD(nr);
 

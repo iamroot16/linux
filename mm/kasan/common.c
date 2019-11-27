@@ -103,6 +103,14 @@ void kasan_check_read(const volatile void *p, unsigned int size)
 }
 EXPORT_SYMBOL(kasan_check_read);
 
+/*
+ * args (이전 함수에서 보내는 arguments)
+ * p = cpumask 의 주소 &(unsigned long bits[0])
+ * size = sizeof(*p) = 8Byte.
+ */
+/*
+ * KernelAddressSANitizer (KASAN) is a dynamic memory error detector. It provides a fast and comprehensive solution for finding use-after-free and out-of-bounds bugs.
+ */
 void kasan_check_write(const volatile void *p, unsigned int size)
 {
 	check_memory_region((unsigned long)p, size, true, _RET_IP_);
