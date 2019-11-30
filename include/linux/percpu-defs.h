@@ -45,6 +45,7 @@
  * linkage errors occur due the compiler generating the wrong code to access
  * that section.
  */
+/* .data..percpu..read_mostly section */
 #define __PCPU_ATTRS(sec)						\
 	__percpu __attribute__((section(PER_CPU_BASE_SECTION sec)))	\
 	PER_CPU_ATTRIBUTES
@@ -95,6 +96,10 @@
 #else
 /*
  * Normal declaration and definition macros.
+ *
+ * __typeof__ -> 변수 타입 반환. int i; __typeof__(i) j equal int j
+ * 결국 아래와 같이 변환된다.
+ *  extern __attribute__((section(.data..percpu..read_mostly)) int cpu_number
  */
 #define DECLARE_PER_CPU_SECTION(type, name, sec)			\
 	extern __PCPU_ATTRS(sec) __typeof__(type) name
@@ -213,6 +218,8 @@
  *
  * + 0 is required in order to convert the pointer type from a
  * potential array type to a pointer to a single item of the array.
+ *
+ * __CHECKER__(정적분석도구) 가 define 되어 있을때 ptr이 percpu 영역에 있는지 검사
  */
 #define __verify_pcpu_ptr(ptr)						\
 do {									\

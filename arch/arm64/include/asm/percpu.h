@@ -30,6 +30,7 @@ static inline void set_my_cpu_offset(unsigned long off)
 			:: "r" (off) : "memory");
 }
 
+/* TPIDR_EL1 - Thread Pointer / ID Register (EL1) 레지스터 값 return */
 static inline unsigned long __my_cpu_offset(void)
 {
 	unsigned long off;
