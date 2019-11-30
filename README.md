@@ -18,7 +18,7 @@ iamroot 16차 커널 스터디 소스 저장소입니다.
 3. push
 
    ``` bash
-   $ git push --all
+   $ git push
    ```
 
 커널 compile
