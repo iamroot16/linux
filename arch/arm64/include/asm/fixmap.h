@@ -47,7 +47,7 @@ enum fixed_addresses {
 	 */
 #define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
 	FIX_FDT_END,
-	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
+	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1, // enum 사이, 가변적임.
 
 	FIX_EARLYCON_MEM_BASE,
 	FIX_TEXT_POKE0,
@@ -91,7 +91,12 @@ enum fixed_addresses {
 
 	__end_of_fixed_addresses
 };
-
+// PAGE_SHIFT == CONFIG_ARM64_PAGE_SHIFT == 12
+// enum fixed_addresses { ... , __end_of_permanent_fixed_addresses , ... }
+// ifdef (X) enum => __end_of_permanent_fixed_addresses == 5 번째 있음...
+// FIXADDR_SIZE = ( 5번째 ) << 12 = 20 
+// __end_of_fixed_addresses == 페이지 개수
+// 즉 , 페이지 개수 만큼 사이즈 잡아줌.
 #define FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START	(FIXADDR_TOP - FIXADDR_SIZE)
 

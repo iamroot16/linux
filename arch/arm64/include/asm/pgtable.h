@@ -633,6 +633,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
 #define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
 
 /* to find an entry in a kernel page-table-directory */
+// unsigned long addr = FIXADDR_START => addr;
+// setup.c 에서 초기화 해주었던 init_mm <..init_mm.h>
+// pgd 테이블 엔트리의 주소를 찾음.
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 #define pgd_set_fixmap(addr)	((pgd_t *)set_fixmap_offset(FIX_PGD, addr))

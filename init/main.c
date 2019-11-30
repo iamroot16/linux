@@ -553,6 +553,16 @@ asmlinkage __visible void __init start_kernel(void)
 
 	cgroup_init_early();
 
+	/*
+	 * Interrupts are still disabled. Do necessary setups, then
+	 * enable them.
+	 */
+	boot_cpu_init();
+	page_address_init(); // 32bit 환경에서 ZONE_HIGHMEM 영역을 메모리 사용을 위함. 
+	pr_notice("%s", linux_banner); // printk 괸련 부분
+	setup_arch(&command_line);
+	/*
+
 	local_irq_disable();
 	early_boot_irqs_disabled = true;
 

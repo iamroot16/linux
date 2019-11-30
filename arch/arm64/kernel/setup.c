@@ -280,6 +280,14 @@ arch_initcall(reserve_memblock_reserved_regions);
 
 u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
+
+/* 
+ * char *command_line;
+ * &command_line
+ * setup_arch(char **cmdline_p)
+ * 
+ * 함수를 호출한 쪽에서 *command_line 을 바꿈.
+ */
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _text;
@@ -287,7 +295,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data   = (unsigned long) _edata;
 	init_mm.brk	   = (unsigned long) _end;
 
-	*cmdline_p = boot_command_line;
+	*cmdline_p = boot_command_line; // main.c , init.h
 
 	early_fixmap_init();
 	early_ioremap_init();
