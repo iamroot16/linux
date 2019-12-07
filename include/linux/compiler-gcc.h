@@ -50,6 +50,13 @@
  * RELOC_HIDE could trash r30. The bug can be worked around by changing
  * the inline assembly constraint from =g to =r, in this particular
  * case either is valid.
+ *
+ * RELOC_HIDE. 컴파일러 에러 방지 위해 사용하는 매크로 함수.
+ * http://studyfoss.egloos.com/5374731
+ *
+ * return : gcc 확장기능. compound statement(중괄호로 둘러싼 여러 statement)를
+ * expression으로 해석하는 기능. 마지막 __ptr + (off) return
+ * (int *) (&cpu_number  + tpidr_el1 value)
  */
 #define RELOC_HIDE(ptr, off)						\
 ({									\

@@ -153,13 +153,6 @@ void ftrace_likely_update(struct ftrace_likely_data *f, int val,
 	= (unsigned long)&sym;
 #endif
 
-/* RELOC_HIDE. 컴파일러 에러 방지 위해 사용하는 매크로 함수.
- * http://studyfoss.egloos.com/5374731
- *
- * return : gcc 확장기능. compound statement(중괄호로 둘러싼 여러 statement)를
- * expression으로 해석하는 기능. 마지막 __ptr + (off) return
- * (int *) (&cpu_number  + tpidr_el1 value)
- * /
 #ifndef RELOC_HIDE
 # define RELOC_HIDE(ptr, off)					\
   ({ unsigned long __ptr;					\
