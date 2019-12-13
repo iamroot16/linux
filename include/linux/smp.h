@@ -195,7 +195,7 @@ static inline int get_boot_cpu_id(void)
  * (i.e. smp_processor_id() use that the debugging code reports but
  * which use for some reason is legal). Don't use this to hack around
  * the warning message, as your code might not work under PREEMPT.
-
+ *
  * percpu 변수 cpu_number 값을 매크로 함수를 통해 읽어 온다
  */
 #ifdef CONFIG_DEBUG_PREEMPT
