@@ -79,6 +79,7 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
 	________addr;							\
 })
 
+/* idx = FIX_PGD, phys = __pa_symbol(pgdp) */
 #define set_fixmap_offset(idx, phys) \
 	__set_fixmap_offset(idx, phys, FIXMAP_PAGE_NORMAL)
 

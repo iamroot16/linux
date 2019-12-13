@@ -54,6 +54,14 @@
 
 #define __TLBI_N(op, arg, n, ...) __TLBI_##n(op, arg)
 
+/* 
+ * __VA_ARGS__ : Variadic(가변 인자) 매크로. 
+ * 매크로 정의에서 줄임표를 최종 형식 인수로 지정하고,
+ * 대체 식별자 __VA_ARGS__ 정의에서 추가 인수 삽입. 
+ * ##가 앞에 붙으면, 가변 인자 수가 0일 때 뒤 ','를 제거 
+ * 따라서, __tlbi()에 op 인자만 있다면 __TLBI_0 호출,
+ * __tlbi()에 op 포함 2개 인자가 있다면 __TLBI_1 호출.
+ */
 #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
 
 #define __tlbi_user(op, arg) do {						\
@@ -150,6 +158,11 @@ static inline void local_flush_tlb_all(void)
 static inline void flush_tlb_all(void)
 {
 	dsb(ishst);
+    /* 
+     * TLBI VMALLE1IS :
+     * Invalidate all stage 1 translations used at EL1 with the current 
+     * virtual machine identifier (VMID) in the Inner Shareable.
+     */
 	__tlbi(vmalle1is);
 	dsb(ish);
 	isb();
@@ -233,17 +246,31 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
 {
 	unsigned long addr;
 
+    /* 
+     * 최대 PTE 크기보다 큰 범위가 입력으로 들어온 경우 
+     * 전체 tlb(translation lookaside buffer)를 flush 
+     */
 	if ((end - start) > (MAX_TLBI_OPS * PAGE_SIZE)) {
 		flush_tlb_all();
 		return;
 	}
 
+    /*
+     * TLBI : TLB Invalidation operation.
+     * __TLBI_VADDR : TLBI를 위한 올바른 형식의  VA를 반환
+     */
 	start = __TLBI_VADDR(start, 0);
 	end = __TLBI_VADDR(end, 0);
 
 	dsb(ishst);
 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
 		__tlbi(vaale1is, addr);
+    /*
+     * TLBI VAALE1IS :
+     * Invalidate all entries from the last level of stage 1 translation table walk 
+     * used at EL1 for the specified address and current VMID and for all ASID values, 
+     * Inner Shareable
+     */
 	dsb(ish);
 	isb();
 }

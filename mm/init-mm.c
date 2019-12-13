@@ -27,7 +27,7 @@
  */
 struct mm_struct init_mm = {
 	.mm_rb		= RB_ROOT,
-	.pgd		= swapper_pg_dir, // head.S 에서 만듦.
+	.pgd		= swapper_pg_dir, // INIT_MM_CONTEXT에서 init_pg_dir 할당
 	.mm_users	= ATOMIC_INIT(2),
 	.mm_count	= ATOMIC_INIT(1),
 	.mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),

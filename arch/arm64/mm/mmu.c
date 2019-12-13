@@ -850,17 +850,27 @@ void __init early_fixmap_init(void)
  * Unusually, this is also called in IRQ context (ghes_iounmap_irq) so if we
  * ever need to use IPIs for TLB broadcasting, then we're in trouble here.
  */
+/*
+ * __set_fixmap : pte 주소 set
+ * pgd_set_fixmap() -> set_fixmap_offset() 을 통해 호출되는 경우, 
+ * idx = FIX_PGD, 
+ * phys = address, 
+ * flags = FIXMAP_PAGE_NORMAL
+ */
 void __set_fixmap(enum fixed_addresses idx,
 			       phys_addr_t phys, pgprot_t flags)
 {
 	unsigned long addr = __fix_to_virt(idx);
 	pte_t *ptep;
 
+    /* fixed_addresses 범위 안인지 확인 (범위 바깥이면 BUG) */
 	BUG_ON(idx <= FIX_HOLE || idx >= __end_of_fixed_addresses);
 
 	ptep = fixmap_pte(addr);
 
+    /* 조건문 : pteval_t 타입의 값이  있는지 확인 */
 	if (pgprot_val(flags)) {
+        /* pfn_pte() : phys 의 page 아래 bits (offset)를  pteval_t 타입 값으로 set */
 		set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, flags));
 	} else {
 		pte_clear(&init_mm, addr, ptep);

@@ -576,6 +576,10 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 
 static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
+    /* 
+     * init_mm에서 .pgd == init_pg_dir
+     * 따라서 in_swapper_pgdir(pgdp)는 false.
+     */
 	if (in_swapper_pgdir(pgdp)) {
 		set_swapper_pgd(pgdp, pgd);
 		return;
