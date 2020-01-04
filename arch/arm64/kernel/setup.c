@@ -182,6 +182,7 @@ static void __init smp_build_mpidr_hash(void)
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
 {
 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+	// fixmap_remap_fdt는 fdt가 2M크거나 FDT Magic Header 가 다른경우에 return 0를 하고, 정상적인 경우엔 return fdt adress 를 한다.
 	const char *name;
 
 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {

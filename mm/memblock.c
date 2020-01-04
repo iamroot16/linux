@@ -589,19 +589,22 @@ int __init_memblock memblock_add_range(struct memblock_type *type,
 {
 	bool insert = false;
 	phys_addr_t obase = base;
+	// memblock_cap_size : ~0 를 넘어가서 Overflow 되는지 확인한다. 
 	phys_addr_t end = base + memblock_cap_size(base, &size);
+	// end = base + size; (round-up은 아님).
 	int idx, nr_new;
 	struct memblock_region *rgn;
 
 	if (!size)
 		return 0;
-
+	// memblock_revers 기준으로 type 에  memblock.reserved type 에  를 준다
 	/* special case for empty array */
 	if (type->regions[0].size == 0) {
+		// cnt == 1, total_size == 0
 		WARN_ON(type->cnt != 1 || type->total_size);
-		type->regions[0].base = base;
-		type->regions[0].size = size;
-		type->regions[0].flags = flags;
+		type->regions[0].base = base; // fdt_base
+		type->regions[0].size = size; // fdt_size
+		type->regions[0].flags = flags; // 0
 		memblock_set_region_node(&type->regions[0], nid);
 		type->total_size = size;
 		return 0;
@@ -612,9 +615,11 @@ repeat:
 	 * then with %true.  The first counts the number of regions needed
 	 * to accommodate the new area.  The second actually inserts them.
 	 */
+
 	base = obase;
 	nr_new = 0;
-
+	// for(idx = 0, rgn = ~~.reserved[0], i < cnt; i++, rgn=next reserved (i)
+	// initial state 이므로 cnt == 1
 	for_each_memblock_type(idx, type, rgn) {
 		phys_addr_t rbase = rgn->base;
 		phys_addr_t rend = rbase + rgn->size;
@@ -830,11 +835,12 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 
 int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 {
+	// base = dt_fdt , size = size;
 	phys_addr_t end = base + size - 1;
 
 	memblock_dbg("memblock_reserve: [%pa-%pa] %pF\n",
 		     &base, &end, (void *)_RET_IP_);
-
+	// MAX_NUMNODES : 1<<2 => 4, 
 	return memblock_add_range(&memblock.reserved, base, size, MAX_NUMNODES, 0);
 }
 
