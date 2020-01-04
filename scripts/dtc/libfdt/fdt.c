@@ -117,11 +117,13 @@ int fdt_check_header(const void *fdt)
 	if (fdt_magic(fdt) != FDT_MAGIC)
 		return -FDT_ERR_BADMAGIC;
 	hdrsize = fdt_header_size(fdt);
+	// fdt_header의version에 따라서 fdt_header의 size를 내보내줌 
 	if ((fdt_version(fdt) < FDT_FIRST_SUPPORTED_VERSION)
 	    || (fdt_last_comp_version(fdt) > FDT_LAST_SUPPORTED_VERSION))
 		return -FDT_ERR_BADVERSION;
 	if (fdt_version(fdt) < fdt_last_comp_version(fdt))
 		return -FDT_ERR_BADVERSION;
+	// fdt_header의 version과 last_comp_version이 동일해야한다.
 
 	if ((fdt_totalsize(fdt) < hdrsize)
 	    || (fdt_totalsize(fdt) > INT_MAX))
@@ -154,18 +156,22 @@ int fdt_check_header(const void *fdt)
 const void *fdt_offset_ptr(const void *fdt, int offset, unsigned int len)
 {
 	unsigned absoffset = offset + fdt_off_dt_struct(fdt);
+	// offset = structure block 안에서의 offset
+	// fdt_off_dt_struct -> fdt 시작 주소 ~ structure block 시작주소
+	//absolute offset = fdt 시작 주소부터의 offset 계산
 
 	if ((absoffset < offset)
 	    || ((absoffset + len) < absoffset)
 	    || (absoffset + len) > fdt_totalsize(fdt))
 		return NULL;
-
+	// len = FDT_TAGSIZE
 	if (fdt_version(fdt) >= 0x11)
 		if (((offset + len) < offset)
 		    || ((offset + len) > fdt_size_dt_struct(fdt)))
 			return NULL;
 
 	return fdt_offset_ptr_(fdt, offset);
+	// offset에 해당되는 가상 주소를 return 
 }
 
 uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
@@ -173,13 +179,16 @@ uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
 	const fdt32_t *tagp, *lenp;
 	uint32_t tag;
 	int offset = startoffset;
+	// offset = 현재 node의 시작 주소
 	const char *p;
 
 	*nextoffset = -FDT_ERR_TRUNCATED;
 	tagp = fdt_offset_ptr(fdt, offset, FDT_TAGSIZE);
+	// tagp = (void *) 현재 node(tag)의 시작 주소(가상 주소)
 	if (!tagp)
 		return FDT_END; /* premature end */
 	tag = fdt32_to_cpu(*tagp);
+	// 현재 node(혹은 tag)의 시작 주소값(가상 주소)의  endian을 local system에 맞춰서 tag에 저장 
 	offset += FDT_TAGSIZE;
 
 	*nextoffset = -FDT_ERR_BADSTRUCTURE;

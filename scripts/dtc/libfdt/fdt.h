@@ -84,10 +84,10 @@ struct fdt_node_header {
 };
 
 struct fdt_property {
-	fdt32_t tag;
-	fdt32_t len;
-	fdt32_t nameoff;
-	char data[0];
+	fdt32_t tag; // Property(3) 에서의 3
+	fdt32_t len; // value length
+	fdt32_t nameoff; // name offset
+	char data[0]; // 가변 길이의 structure 일때
 };
 
 #endif /* !__ASSEMBLY */

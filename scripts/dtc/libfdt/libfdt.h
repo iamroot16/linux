@@ -164,11 +164,15 @@ uint32_t fdt_next_tag(const void *fdt, int offset, int *nextoffset);
 static inline uint32_t fdt32_ld(const fdt32_t *p)
 {
 	const uint8_t *bp = (const uint8_t *)p;
+	// 현재 로컬 디바이스의 엔디안이 어떤지 모르기 때문에
+	// 빅 엔디안, 리틀 엔디안을 맞춰주기 위해서(로컬 시스템의 방식에 맞춰주기 위함) 
 
 	return ((uint32_t)bp[0] << 24)
 		| ((uint32_t)bp[1] << 16)
 		| ((uint32_t)bp[2] << 8)
 		| bp[3];
+	// return 이하는 p값을 재조립 해주는 과정! (1byte씩 읽고 shift해서 or 연산으로  다시 붙여줌)
+    // shift 연산을 해서 새로 저장이 될 때, 로컬 디바이스의 엔디안에 맞춰서 저장이 된다.
 }
 
 static inline uint64_t fdt64_ld(const fdt64_t *p)

@@ -707,7 +707,7 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 
 	if (!blob)
 		return 0;
-
+	// fdt가 존재하지 않는경우(blob = 0) -> 할게 없으므로 return 0
 	for (offset = fdt_next_node(blob, -1, &depth);
 	     offset >= 0 && depth >= 0 && !rc;
 	     offset = fdt_next_node(blob, offset, &depth)) {
@@ -789,6 +789,8 @@ const void *__init of_get_flat_dt_prop(unsigned long node, const char *name,
 				       int *size)
 {
 	return fdt_getprop(initial_boot_params, node, name, size);
+	// fdt_get property
+	// initial_boot_params = dt_virt
 }
 
 /**
@@ -913,7 +915,7 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
 	const __be32 *prop;
 
 	pr_debug("Looking for initrd properties... ");
-
+	// log 찍어주기
 	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &len);
 	if (!prop)
 		return;
@@ -1193,6 +1195,8 @@ static void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 bool __init early_init_dt_verify(void *params)
 {
 	if (!params)
+		// params = dt_virt
+		// fdt가 있는지 없는지 체크
 		return false;
 
 	/* check device tree validity */
@@ -1225,9 +1229,11 @@ void __init early_init_dt_scan_nodes(void)
 
 bool __init early_init_dt_scan(void *params)
 {
+	// params = dt_virt
 	bool status;
 
 	status = early_init_dt_verify(params);
+	// fdt_header 구조체의 값들을 하나하나 범위 내에 잘 드는지 Magic값 검사 ~ CRC검사까지 진행
 	if (!status)
 		return false;
 
