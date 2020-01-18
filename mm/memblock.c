@@ -638,7 +638,7 @@ repeat:
 #endif
 			WARN_ON(flags != rgn->flags);
 			nr_new++;
-			if (insert)
+			if (insert) // 2nd round
 				memblock_insert_region(type, idx++, base,
 						       rbase - base, nid,
 						       flags);
@@ -650,7 +650,7 @@ repeat:
 	/* insert the remaining portion */
 	if (base < end) {
 		nr_new++;
-		if (insert)
+		if (insert) // 2nd round
 			memblock_insert_region(type, idx, base, end - base,
 					       nid, flags);
 	}
@@ -662,13 +662,13 @@ repeat:
 	 * If this was the first round, resize array and repeat for actual
 	 * insertions; otherwise, merge and return.
 	 */
-	if (!insert) {
+	if (!insert) { // 1st round
 		while (type->cnt + nr_new > type->max)
 			if (memblock_double_array(type, obase, size) < 0)
 				return -ENOMEM;
 		insert = true;
 		goto repeat;
-	} else {
+	} else { // 2nd round
 		memblock_merge_regions(type);
 		return 0;
 	}
@@ -1063,6 +1063,7 @@ void __init_memblock __next_mem_range(u64 *idx, int nid,
 			phys_addr_t r_start;
 			phys_addr_t r_end;
 
+// https://raw.githubusercontent.com/wiki/iamroot16a/study/image/memblock_next_mem_range_1.png
 			r = &type_b->regions[idx_b];
 			r_start = idx_b ? r[-1].base + r[-1].size : 0;
 			r_end = idx_b < type_b->cnt ?
@@ -1088,7 +1089,7 @@ void __init_memblock __next_mem_range(u64 *idx, int nid,
 				 * advanced for the next iteration.
 				 */
 				if (m_end <= r_end)
-					idx_a++;
+					idx_a++; // sort-ascending
 				else
 					idx_b++;
 				*idx = (u32)idx_a | (u64)idx_b << 32;
@@ -1186,8 +1187,9 @@ void __init_memblock __next_mem_range_rev(u64 *idx, int nid,
 					*out_end = min(m_end, r_end);
 				if (out_nid)
 					*out_nid = m_nid;
+				// __next_mem_range와 다른 부분
 				if (m_start >= r_start)
-					idx_a--;
+					idx_a--; // sort-descending
 				else
 					idx_b--;
 				*idx = (u32)idx_a | (u64)idx_b << 32;
