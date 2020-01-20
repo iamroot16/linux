@@ -369,7 +369,7 @@ static const struct fdt_property *fdt_get_property_by_offset_(const void *fdt,
 {
 	int err;
 	const struct fdt_property *prop;
-
+	
 	if ((err = fdt_check_prop_offset_(fdt, offset)) < 0) {
 		if (lenp)
 			*lenp = err;
@@ -399,7 +399,11 @@ const struct fdt_property *fdt_get_property_by_offset(const void *fdt,
 
 	return fdt_get_property_by_offset_(fdt, offset, lenp);
 }
-
+// Node의 시작 오프셋을 받고, 속성 값을 순회하면서 찾는 속성을 리턴하고, 
+// 성공 시,	 poffset에는 순회 동안 이동한 offset을 넘겨준다.
+// 			 lenp에는 속성의 길이를 넘겨준다.
+//			프로퍼티를 리턴한다.
+// 실패 시,	
 static const struct fdt_property *fdt_get_property_namelen_(const void *fdt,
 						            int offset,
 						            const char *name,
@@ -423,7 +427,7 @@ static const struct fdt_property *fdt_get_property_namelen_(const void *fdt,
 			return prop;
 		}
 	}
-
+	// 탐색에 실패한다면 lenp에 offset을 넣어준다.
 	if (lenp)
 		*lenp = offset;
 	return NULL;
@@ -455,7 +459,8 @@ const struct fdt_property *fdt_get_property(const void *fdt,
 	return fdt_get_property_namelen(fdt, nodeoffset, name,
 					strlen(name), lenp);
 }
-
+// lenp이 Null이 아니라면, 데이터의 길이를 저장한다.
+// 데이터의 시작을 리턴한다.
 const void *fdt_getprop_namelen(const void *fdt, int nodeoffset,
 				const char *name, int namelen, int *lenp)
 {

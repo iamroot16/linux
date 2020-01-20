@@ -714,8 +714,8 @@ int __init_memblock memblock_add(phys_addr_t base, phys_addr_t size)
 }
 
 /**
- * memblock_isolate_range - isolate given range into disjoint memblocks
  * @type: memblock type to isolate range for
+ * memblock_isolate_range - isolate given range into disjoint memblocks
  * @base: base of range to isolate
  * @size: size of range to isolate
  * @start_rgn: out parameter for the start of isolated region
@@ -764,6 +764,7 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 			rgn->base = base;
 			rgn->size -= base - rbase;
 			type->total_size -= base - rbase;
+			// 새로운 영역이 추가되고 다음 루프에 추가된 영역을 대상으로 진행된다.
 			memblock_insert_region(type, idx, rbase, base - rbase,
 					       memblock_get_region_node(rgn),
 					       rgn->flags);
@@ -775,6 +776,7 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 			rgn->base = end;
 			rgn->size -= end - rbase;
 			type->total_size -= end - rbase;
+			// 새로운 영역이 추가되고 같은 인덱스로 한번 더 루프를 진행한다.
 			memblock_insert_region(type, idx--, rbase, end - rbase,
 					       memblock_get_region_node(rgn),
 					       rgn->flags);
@@ -1160,7 +1162,7 @@ void __init_memblock __next_mem_range_rev(u64 *idx, int nid,
 			*idx = (u32)idx_a | (u64)idx_b << 32;
 			return;
 		}
-
+		// Type B에 대한 배타적인 영역을 구하는 구한다.
 		/* scan areas before each reservation */
 		for (; idx_b >= 0; idx_b--) {
 			struct memblock_region *r;
