@@ -369,7 +369,7 @@ static const struct fdt_property *fdt_get_property_by_offset_(const void *fdt,
 {
 	int err;
 	const struct fdt_property *prop;
-	
+
 	if ((err = fdt_check_prop_offset_(fdt, offset)) < 0) {
 		if (lenp)
 			*lenp = err;
@@ -403,7 +403,6 @@ const struct fdt_property *fdt_get_property_by_offset(const void *fdt,
 // 성공 시,	 poffset에는 순회 동안 이동한 offset을 넘겨준다.
 // 			 lenp에는 속성의 길이를 넘겨준다.
 //			프로퍼티를 리턴한다.
-// 실패 시,	
 static const struct fdt_property *fdt_get_property_namelen_(const void *fdt,
 						            int offset,
 						            const char *name,

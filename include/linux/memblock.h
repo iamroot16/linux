@@ -63,7 +63,7 @@ struct memblock_region {
  * struct memblock_type - collection of memory regions of certain type
  * @cnt: number of regions
  * @max: size of the allocated array
- * @total_size: size of all regions
+ * @total_size: size of all regions (byte?)
  * @regions: array of regions
  * @name: the memory type symbolic name
  */
