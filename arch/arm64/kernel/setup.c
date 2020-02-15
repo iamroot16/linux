@@ -310,6 +310,10 @@ void __init setup_arch(char **cmdline_p)
 	 * earlycon. (Report possible System Errors once we can report this
 	 * occurred).
 	 */
+	
+	/* Debug, Abort, Irq, Fast irq
+        on     on    off     on
+	*/
 	local_daif_restore(DAIF_PROCCTX_NOIRQ);
 
 	/*

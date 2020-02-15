@@ -62,11 +62,13 @@ static inline void local_daif_restore(unsigned long flags)
 		if (system_uses_irq_prio_masking())
 			arch_local_irq_enable();
 	} else if (!(flags & PSR_A_BIT)) {
+		/* I flag masked, A bit unmasked */
 		/*
 		 * If interrupts are disabled but we can take
 		 * asynchronous errors, we can take NMIs
 		 */
 		if (system_uses_irq_prio_masking()) {
+			/* I flag는 0이 된다.(unmasked)*/
 			flags &= ~PSR_I_BIT;
 			/*
 			 * There has been concern that the write to daif
@@ -90,7 +92,10 @@ static inline void local_daif_restore(unsigned long flags)
 			arch_local_irq_disable();
 		}
 	}
-
+	/* I flag A flag
+	 *    1     0     ->  0       0 -> using pmr 
+	 *    1     1     ->  1       1 -> using daif
+	 */
 	write_sysreg(flags, daif);
 
 	if (irq_disabled)
