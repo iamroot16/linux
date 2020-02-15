@@ -54,6 +54,7 @@ static inline void cpu_set_reserved_ttbr0(void)
 	unsigned long ttbr = phys_to_ttbr(__pa_symbol(empty_zero_page));
 
 	write_sysreg(ttbr, ttbr0_el1);
+	/* ttbr0_el1에 empty_zero_page 물리주소 저장 */
 	isb();
 }
 
@@ -99,6 +100,7 @@ static inline void __cpu_set_tcr_t0sz(unsigned long t0sz)
 	if (!__cpu_uses_extended_idmap())
 		return;
 
+	/* 64 - VA_BITS = 16 을 tcr_el1 레지스터의 TCR_T0SZ bit에 설정 */
 	tcr = read_sysreg(tcr_el1);
 	tcr &= ~TCR_T0SZ_MASK;
 	tcr |= t0sz << TCR_T0SZ_OFFSET;
