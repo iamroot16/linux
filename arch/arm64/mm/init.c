@@ -277,20 +277,23 @@ static int __init early_mem(char *p)
 }
 early_param("mem", early_mem);
 
+// it(offset, pathp, depth, data); pathp data == reg
 static int __init early_init_dt_scan_usablemem(unsigned long node,
 		const char *uname, int depth, void *data)
 {
 	struct memblock_region *usablemem = data;
-	const __be32 *reg;
+	const __be32 *reg; // BIG ENDIAN 32 bit
 	int len;
 
+	// depth 가 1인 이고 , chosen인 노드 "linux,usable-memory-range"
 	if (depth != 1 || strcmp(uname, "chosen") != 0)
 		return 0;
-
+	// Document chosen.txt 참고!!
 	reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
+	// reg 없으면 error! && address 사이즈 보다 작으면 error!
 	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
 		return 1;
-
+	// cell 을 읽는 부분
 	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
 	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
 
@@ -311,6 +314,7 @@ static void __init fdt_enforce_memory_region(void)
 
 void __init arm64_memblock_init(void)
 {
+	// 맨 앞의 0xFFFF 가 날아간다. 
 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
 
 	/* Handle linux,usable-memory-range property */
@@ -324,11 +328,16 @@ void __init arm64_memblock_init(void)
 	 * virtual address space. This way, we can distinguish a linear address
 	 * from a kernel/module/vmalloc address by testing a single bit.
 	 */
+	y
+	// VA_BITS (48) : 0x800...
 	BUILD_BUG_ON(linear_region_size != BIT(VA_BITS - 1));
 
 	/*
 	 * Select a suitable value for the base of physical memory.
 	 */
+
+	//  #define ARM64_MEMSTART_ALIGN	(1UL << ARM64_MEMSTART_SHIFT)
+	// memblock_start_of_DRAM() == memblock.memory.regions[0].base;
 	memstart_addr = round_down(memblock_start_of_DRAM(),
 				   ARM64_MEMSTART_ALIGN);
 
@@ -337,12 +346,19 @@ void __init arm64_memblock_init(void)
 	 * linear mapping. Take care not to clip the kernel which may be
 	 * high in memory.
 	 */
+
+	// 물리 메모리에서 접근이 안되는 부분은 날림. 
+
 	memblock_remove(max_t(u64, memstart_addr + linear_region_size,
 			__pa_symbol(_end)), ULLONG_MAX);
+
+	// 라운드 다운된 memstart_addr 이 더 아래에 있을때 의 예외 처리함.
+
 	if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
 		/* ensure that memstart_addr remains sufficiently aligned */
 		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
 					 ARM64_MEMSTART_ALIGN);
+		// 아래 부분을 날림.
 		memblock_remove(0, memstart_addr);
 	}
 

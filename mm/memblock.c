@@ -356,7 +356,7 @@ again:
 
 	return ret;
 }
-
+// memblock_remove_region(&memblock.memory, i);
 static void __init_memblock memblock_remove_region(struct memblock_type *type, unsigned long r)
 {
 	type->total_size -= type->regions[r].size;
@@ -805,7 +805,7 @@ static int __init_memblock memblock_remove_range(struct memblock_type *type,
 		memblock_remove_region(type, i);
 	return 0;
 }
-
+// memblock_remove(1ULL << PHYS_MASK_SHIFT, ULLONG_MAX); 2^48 , 0xff...
 int __init_memblock memblock_remove(phys_addr_t base, phys_addr_t size)
 {
 	phys_addr_t end = base + size - 1;
@@ -1615,6 +1615,7 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
 			      PHYS_ADDR_MAX);
 }
 
+// memblock_cap_memory_range(reg.base, reg.size);
 void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
 {
 	int start_rgn, end_rgn;

@@ -94,7 +94,7 @@ e.g.
 		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
 	};
 };
-
+-> 64 비트 주소를 표현하기 위해서는 <어드레스 사이즈> 쌍을 64비트로 표현함.
 The main usage is for crash dump kernel to identify its own usable
 memory and exclude, at its boot time, any other memory areas that are
 part of the panicked kernel's memory.
