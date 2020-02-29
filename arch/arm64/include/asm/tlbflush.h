@@ -147,6 +147,7 @@
  *	on top of these routines, since that is our interface to the mmu_gather
  *	API as used by munmap() and friends.
  */
+/* 호출한 cpu의 tlb 캐시를 비움 */
 static inline void local_flush_tlb_all(void)
 {
 	dsb(nshst);

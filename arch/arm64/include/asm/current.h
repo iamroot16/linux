@@ -15,7 +15,7 @@ struct task_struct;
 static __always_inline struct task_struct *get_current(void)
 {
 	unsigned long sp_el0;
-
+	/* sp_el0 - head.S 에서 init_task 저장 */
 	asm ("mrs %0, sp_el0" : "=r" (sp_el0));
 
 	return (struct task_struct *)sp_el0;
