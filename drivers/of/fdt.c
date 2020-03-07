@@ -563,6 +563,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 		return -EINVAL;
 	}
 
+    // 함수의 반환된 값이 NULL이 "아닐" 때 nomap이 true 
 	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
 
 	while (len >= t_len) {
@@ -618,6 +619,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
 	static int found;
 	int err;
 
+    // Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt에서 example 참조
 	if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
 		if (__reserved_mem_check_root(node) != 0) {
 			pr_err("Reserved memory: unsupported node format, ignoring\n");
@@ -635,6 +637,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
 		return 1;
 	}
 
+    // reserved-memory의 child-node들이 진입 가능
 	if (!of_fdt_device_is_available(initial_boot_params, node))
 		return 0;
 
@@ -658,6 +661,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 	int n;
 	u64 base, size;
 
+    // initial_boot_params : fdt의 시작주소, early_init_dt_verify에서 설정
 	if (!initial_boot_params)
 		return;
 
@@ -715,6 +719,7 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 		pathp = fdt_get_name(blob, offset, NULL);
 		if (*pathp == '/')
 			pathp = kbasename(pathp);
+        // it의 반환이 true이면 loop 탈출
 		rc = it(offset, pathp, depth, data);
 	}
 	return rc;

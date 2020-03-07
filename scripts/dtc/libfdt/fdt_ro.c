@@ -170,9 +170,12 @@ uint32_t fdt_get_max_phandle(const void *fdt)
 	return 0;
 }
 
+// fdt의 memory reserve block의 n번째 엔트리의 주소를 반환
+// fdt_mem_rsv_의 wrapper 함수
 static const struct fdt_reserve_entry *fdt_mem_rsv(const void *fdt, int n)
 {
 	int offset = n * sizeof(struct fdt_reserve_entry);
+    // fdt의 시작주소로부터 memory reserve block의 n번째 엔트리에 대한 offset 
 	int absoffset = fdt_off_mem_rsvmap(fdt) + offset;
 
 	if (absoffset < fdt_off_mem_rsvmap(fdt))
@@ -182,6 +185,7 @@ static const struct fdt_reserve_entry *fdt_mem_rsv(const void *fdt, int n)
 	return fdt_mem_rsv_(fdt, n);
 }
 
+// fdt의 memory reserve block의 n번째 엔트리가 가진 주소와 크기를 반환
 int fdt_get_mem_rsv(const void *fdt, int n, uint64_t *address, uint64_t *size)
 {
 	const struct fdt_reserve_entry *re;

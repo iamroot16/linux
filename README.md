@@ -26,7 +26,11 @@ iamroot 16차 커널 스터디 소스 저장소입니다.
 
 1. toolchain 다운로드
 
-   저는 developer.arm.com 에서 다운 받은 toolchain 을 사용했습니다.
+   저는 developer.arm.com 에서 다운 받은 toolchain 을 사용했습니다. 
+
+
+   [최신 다운로드 링크](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-a/downloads)
+
 
    [gcc-arm-8.3-2019.03-x86_64-aarch64-linux-gnu.tar.xz](https://developer.arm.com/-/media/Files/downloads/gnu-a/8.3-2019.03/binrel/gcc-arm-8.3-2019.03-x86_64-aarch64-linux-gnu.tar.xz?revision=2e88a73f-d233-4f96-b1f4-d8b36e9bb0b9&la=en&hash=167687FADA00B73D20EED2A67D0939A197504ACD)
 
