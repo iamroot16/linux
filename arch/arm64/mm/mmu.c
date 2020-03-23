@@ -341,7 +341,13 @@ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
 
 	pud_clear_fixmap();
 }
-
+/* example)
+* phys = 	0x000040080000
+* _text:	0x000010080000
+* _etext:	0x000010b60000
+* 
+* pgdp는 0번 인덱스 
+*/
 static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
 				 unsigned long virt, phys_addr_t size,
 				 pgprot_t prot,
@@ -349,6 +355,7 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
 				 int flags)
 {
 	unsigned long addr, length, end, next;
+	
 	pgd_t *pgdp = pgd_offset_raw(pgdir, virt);
 
 	/*
@@ -364,6 +371,13 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
 
 	end = addr + length;
 	do {
+		/* example)
+		 * addr:	0x000010080000
+		 * end:		0x008010b60000
+		 *
+		 * 1)next = 0x008000000000
+		 * 2)next = 0x008010b60000
+		 */
 		next = pgd_addr_end(addr, end);
 		alloc_init_pud(pgdp, addr, next, phys, prot, pgtable_alloc,
 			       flags);
