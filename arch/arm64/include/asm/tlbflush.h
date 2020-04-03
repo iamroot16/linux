@@ -150,9 +150,18 @@
 /* 호출한 cpu의 tlb 캐시를 비움 */
 static inline void local_flush_tlb_all(void)
 {
+	/* nshst(non sharable store)
+	 * non sharble 영역에서, store 명령어에 대해 동기화 시점을 제공한다.
+     * 즉, 현재 시점에서의 인스트럭션은 store명령어가 완료되고 나서 실행됨을 보장한다. 
+	 */
 	dsb(nshst);
+	/* vmalle1(virtual memory all exception level 1)
+	 * => exception level1의 모든 가상 메모리에 해당하는 엔트리를 비운다. */
 	__tlbi(vmalle1);
-	dsb(nsh);
+	/* nsh(non sharble)
+	 * store, load가 완료되고 실행됨을 보장한다.
+	 */
+	 dsb(nsh);
 	isb();
 }
 
