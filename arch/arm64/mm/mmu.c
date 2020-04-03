@@ -672,19 +672,28 @@ static void __init map_kernel(pgd_t *pgdp)
 
 void __init paging_init(void)
 {
+	// http://jake.dothome.co.kr/map64/
+	// 커널 페이지 테이블로 사용할 pgd 테이블로 컴파일 타임에 static하게 
+	// 생성한 swapper_pg_dir 테이블을 사용하여 fixmap 영역의 pgd 엔트리에 매핑한다. 
+	// fixmap에 매핑 하였으므로 swapper_pg_dir 페이지 테이블에 access가 가능해졌다.
 	pgd_t *pgdp = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
 
+	// 새로 사용할 swapper_pg_dir 페이지 테이블에 커널(코드 및 데이터) 영역과 메모리 영역을 매핑한다.
 	map_kernel(pgdp);
 	map_mem(pgdp);
 
+	// fixmap에 매핑한 swapper_pg_dir은 곧 ttbr 레지스터를 통해 정식으로 사용될 예정이므로 
+	// fixmap에서 분리하기 위해 fixmap 영역의 pgd 엔트리에 매핑한 pgd 테이블을 매핑 해제한다.
 	pgd_clear_fixmap();
 
+	// 커널용 페이지 테이블을 가리키는 ttbr1이 새로 준비한 swapper_pg_dir을 가리키도록 한다.
 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
 	init_mm.pgd = swapper_pg_dir;
 
+	// 임시로 사용한 init_pg_dir 페이지 테이블 영역을 memblock에 할당 해제 한다. (소멸)
 	memblock_free(__pa_symbol(init_pg_dir),
 		      __pa_symbol(init_pg_end) - __pa_symbol(init_pg_dir));
-
+	// 지금부터 memblock이 확장될 수 있게 설정한다.
 	memblock_allow_resize();
 }
 

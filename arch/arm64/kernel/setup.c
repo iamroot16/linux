@@ -328,6 +328,7 @@ void __init setup_arch(char **cmdline_p)
 
 	paging_init();
 
+	// ACPI : 고급구성 및 전원관리인터페이스 ???
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */

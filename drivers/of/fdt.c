@@ -276,6 +276,7 @@ static void populate_properties(const void *blob,
 		*pprev = NULL;
 }
 
+// 노드를 파싱하여 디바이스 노드로 변환한다. 성공 시 true를 반환한다.
 static bool populate_node(const void *blob,
 			  int offset,
 			  void **mem,
@@ -287,6 +288,7 @@ static bool populate_node(const void *blob,
 	const char *pathp;
 	unsigned int l, allocl;
 
+	// 노드 명이 null인 경우 출력 인자 @pnp에 null을 대입한 후 더 이상 처리하지 않고 false를 반환한다.
 	pathp = fdt_get_name(blob, offset, &l);
 	if (!pathp) {
 		*pnp = NULL;
@@ -295,15 +297,17 @@ static bool populate_node(const void *blob,
 
 	allocl = ++l;
 
+	// @mem에서 노드가 저장될 영역을 확보한다.
 	np = unflatten_dt_alloc(mem, sizeof(struct device_node) + allocl,
 				__alignof__(struct device_node));
+	// 2nd pass인 경우 노드를 초기화 하고, 노드 명을 지정한 후 노드 간의 관계를 연결한다.
 	if (!dryrun) {
 		char *fn;
 		of_node_init(np);
 		np->full_name = fn = ((char *)np) + sizeof(*np);
-
+결
 		memcpy(fn, pathp, l);
-
+		// 부모, 형제, 자식을 연결
 		if (dad != NULL) {
 			np->parent = dad;
 			np->sibling = dad->child;
@@ -355,6 +359,7 @@ static void reverse_nodes(struct device_node *parent)
  *
  * It returns the size of unflattened device tree or error code
  */
+// http://jake.dothome.co.kr/unflatten_device_tree/
 static int unflatten_dt_nodes(const void *blob,
 			      void *mem,
 			      struct device_node *dad,
@@ -367,6 +372,7 @@ static int unflatten_dt_nodes(const void *blob,
 	void *base = mem;
 	bool dryrun = !base;
 
+	// 먼저 출력 인자 @nodepp에 null을 대입한다.
 	if (nodepp)
 		*nodepp = NULL;
 
@@ -377,32 +383,40 @@ static int unflatten_dt_nodes(const void *blob,
 	 * immediately when negative @depth is found. Otherwise, the device
 	 * nodes except the first one won't be unflattened successfully.
 	 */
+	// @dad가 지정된 경우에 한해 depth와 초기 depth를 1부터 시작한다.
 	if (dad)
 		depth = initial_depth = 1;
 
 	root = dad;
 	nps[depth] = dad;
 
+	// 다음(next) 노드를 읽고 offset을 알아온다. 이 때 읽은 노드의 depth도 알아온다.
 	for (offset = 0;
 	     offset >= 0 && depth >= initial_depth;
 	     offset = fdt_next_node(blob, offset, &depth)) {
 		if (WARN_ON_ONCE(depth >= FDT_MAX_DEPTH))
 			continue;
 
+		// 노드가  enable 또는 ok 상태가 아닌 경우는 skip 한다.
 		if (!IS_ENABLED(CONFIG_OF_KOBJ) &&
 		    !of_fdt_device_is_available(blob, offset))
 			continue;
 
+		// 노드를 활성화한다. 지금까지 변환한 사이즈를 반환한다.
 		if (!populate_node(blob, offset, &mem, nps[depth],
 				   &nps[depth+1], dryrun))
 			return mem - base;
 
+		// 2nd pass에서 @nodepp에 현재 노드를 지정한다. 단 한 번만 지정한다.
 		if (!dryrun && nodepp && !*nodepp)
 			*nodepp = nps[depth+1];
+		
+		// 2nd pass의 루트가 아니고 아직 루트가 지정되지 않은 경우 현재 노드를 루트로 지정한다.
 		if (!dryrun && !root)
 			root = nps[depth+1];
 	}
 
+	// 노드 파싱에 문제가 있는 경우 에러를 반환한다.
 	if (offset < 0 && offset != -FDT_ERR_NOTFOUND) {
 		pr_err("Error %d processing FDT\n", offset);
 		return -EINVAL;
@@ -412,9 +426,11 @@ static int unflatten_dt_nodes(const void *blob,
 	 * Reverse the child list. Some drivers assumes node order matches .dts
 	 * node order
 	 */
+	// 2nd pass인 경우 노드를 reverse 한다.
 	if (!dryrun)
 		reverse_nodes(root);
 
+	// 지금까지 변환한 사이즈를 반환한다.
 	return mem - base;
 }
 
@@ -456,20 +472,29 @@ void *__unflatten_device_tree(const void *blob,
 	pr_debug("size: %08x\n", fdt_totalsize(blob));
 	pr_debug("version: %08x\n", fdt_version(blob));
 
+	// DTB의 첫 부분에 위치한 헤더에서 첫 워드를 통해 DTB 데이터 여부를 체크한다. 
+	// 추가로 지원 가능한 DTB 버전이 0x02 ~ 0x11인지 확인하여 체크하고, 
+	// 다른 경우 에러를 출력하고 처리를 하지 않는다.
 	if (fdt_check_header(blob)) {
 		pr_err("Invalid device tree blob header\n");
 		return NULL;
 	}
 
 	/* First pass, scan for size */
+	// 가장 마지막 인자 dryrun을 true로 전달하여 실제 컨버팅 동작을 하지 않고 
+	// DTB를 unflatten할 때 만들어질 device_node 구조체들과 
+	// properties 구조체들의 구성에 필요한 "전체 크기"만을 구한다. 
 	size = unflatten_dt_nodes(blob, NULL, dad, NULL);
 	if (size < 0)
 		return NULL;
 
+	// 그리고 최종 산출된 크기를 워드(4바이트) 단위로 정렬한다.	
 	size = ALIGN(size, 4);
 	pr_debug("  size is %d, allocating...\n", size);
 
 	/* Allocate memory for the expanded device tree */
+	// __alignof__ : gcc의 기능으로 주어진 형식이나 lvalue의 정렬을 위해 필요한 byte 수를 알려줍니다.
+	// https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gcc/Alignment.html
 	mem = dt_alloc(size + 4, __alignof__(struct device_node));
 	if (!mem)
 		return NULL;
@@ -1186,6 +1211,7 @@ int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
 	return memblock_reserve(base, size);
 }
 
+// align 단위로 size 만큼의 공간을 memblock으로 부터 할당 받고 그 가상 주소를 리턴한다.
 static void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 {
 	void *ptr = memblock_alloc(size, align);
@@ -1254,12 +1280,18 @@ bool __init early_init_dt_scan(void *params)
  * pointers of the nodes so the normal device-tree walking functions
  * can be used.
  */
+// http://jake.dothome.co.kr/unflatten_device_tree/
+// device_node와 property 구조체를 사용하여 트리 구조로 각 노드와 속성을 연결한다.
+// 기존에 사용하던 DTB 바이너리들도 문자열등을 그대로 사용하므로 삭제되지 않고 유지된다.
+// DTB를 확장 포맷으로 변환하고 관련 전역 변수가 적절한 노드를 가리키도록 초기화한다.
 void __init unflatten_device_tree(void)
 {
+	// 4바이트 단위의 바이너리로 구성된 DTB를 파싱하여 확장 포맷으로 변환한 후 of_root 전역 변수가 가리키게 한다.
 	__unflatten_device_tree(initial_boot_params, NULL, &of_root,
 				early_init_dt_alloc_memory_arch, false);
 
 	/* Get pointer to "/chosen" and "/aliases" nodes for use everywhere */
+	// 전역 aliases_lookup 리스트에 alias_prop들을 추가한다
 	of_alias_scan(early_init_dt_alloc_memory_arch);
 
 	unittest_unflatten_overlay_base();

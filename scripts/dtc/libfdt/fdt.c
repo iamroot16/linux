@@ -174,6 +174,8 @@ const void *fdt_offset_ptr(const void *fdt, int offset, unsigned int len)
 	// offset에 해당되는 가상 주소를 return 
 }
 
+// 다음 노드의 offset를 리턴하고 출력 인수에 depth를 저장한다.
+// http://jake.dothome.co.kr/dtb-fdt-api/
 uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
 {
 	const fdt32_t *tagp, *lenp;
@@ -248,15 +250,19 @@ int fdt_check_prop_offset_(const void *fdt, int offset)
 	return offset;
 }
 
+// 다음 노드의 offset를 리턴하고 출력 인수에 depth를 저장한다.
+// http://jake.dothome.co.kr/dtb-fdt-api/
 int fdt_next_node(const void *fdt, int offset, int *depth)
 {
 	int nextoffset = 0;
 	uint32_t tag;
 
+	// 주어진 offset가 노드가 아닌 경우 null을 리턴한다.
 	if (offset >= 0)
 		if ((nextoffset = fdt_check_node_offset_(fdt, offset)) < 0)
 			return nextoffset;
 
+	// 루프를 돌며 태그 번호와 다음 태그 offset을 알아오고 태그에 따라 다음과 같이 동작한다.
 	do {
 		offset = nextoffset;
 		tag = fdt_next_tag(fdt, offset, &nextoffset);
@@ -266,17 +272,21 @@ int fdt_next_node(const void *fdt, int offset, int *depth)
 		case FDT_NOP:
 			break;
 
-		case FDT_BEGIN_NODE:
+		case FDT_BEGIN_NODE: 
+			// depth 증가하게 되고 루프를 벗어나게 된다.
 			if (depth)
 				(*depth)++;
 			break;
 
-		case FDT_END_NODE:
+		case FDT_END_NODE: 
+			// depth가 0이상이면서 감소 시킨 depth가 0보다 작은 경우 
+			// nextoffset를 리턴한다. (보통 또 다른 시작 노드)
 			if (depth && ((--(*depth)) < 0))
 				return nextoffset;
 			break;
 
 		case FDT_END:
+			//  음수 갑ㅅ인 에러를 리턴한다.
 			if ((nextoffset >= 0)
 			    || ((nextoffset == -FDT_ERR_TRUNCATED) && !depth))
 				return -FDT_ERR_NOTFOUND;

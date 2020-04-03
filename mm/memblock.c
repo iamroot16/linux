@@ -791,16 +791,19 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 	return 0;
 }
 
+// 요청한 @type의 memblock에서 물리 주소 @base 부터 @size까지 영역을 제거한다.
 static int __init_memblock memblock_remove_range(struct memblock_type *type,
 					  phys_addr_t base, phys_addr_t size)
 {
 	int start_rgn, end_rgn;
 	int i, ret;
 
+	// 제거할 영역의 시작과 끝 주소를 기준으로 memblock을 분리한다.
 	ret = memblock_isolate_range(type, base, size, &start_rgn, &end_rgn);
 	if (ret)
 		return ret;
 
+	// 제거할 영역에 해당하는 memblock 영역을 삭제한다.
 	for (i = end_rgn - 1; i >= start_rgn; i--)
 		memblock_remove_region(type, i);
 	return 0;
@@ -824,14 +827,18 @@ int __init_memblock memblock_remove(phys_addr_t base, phys_addr_t size)
  * Free boot memory block previously allocated by memblock_alloc_xx() API.
  * The freeing memory will not be released to the buddy allocator.
  */
+// http://jake.dothome.co.kr/memblock-1/
+// 물리 메모리 주소 @base 부터 @size 만큼을 reserved 타입 memblock 영역에서 제거한다.
 int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 {
 	phys_addr_t end = base + size - 1;
 
 	memblock_dbg("   memblock_free: [%pa-%pa] %pF\n",
 		     &base, &end, (void *)_RET_IP_);
-
+	// 커널메모리 Leak 검출하는 영역에서 제거???
 	kmemleak_free_part_phys(base, size);
+
+	// memblock 에서 제거한다 
 	return memblock_remove_range(&memblock.reserved, base, size);
 }
 
@@ -1829,6 +1836,7 @@ void __init_memblock __memblock_dump_all(void)
 
 void __init memblock_allow_resize(void)
 {
+	// memblock_double_array() 에서 확인하는 변수
 	memblock_can_resize = 1;
 }
 
