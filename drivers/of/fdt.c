@@ -411,7 +411,7 @@ static int unflatten_dt_nodes(const void *blob,
 		if (!dryrun && nodepp && !*nodepp)
 			*nodepp = nps[depth+1];
 		
-		// 2nd pass의 루트가 아니고 아직 루트가 지정되지 않은 경우 현재 노드를 루트로 지정한다.
+		// 2nd pass이고 아직 루트가 지정되지 않은 경우 현재 노드를 루트로 지정한다.
 		if (!dryrun && !root)
 			root = nps[depth+1];
 	}
