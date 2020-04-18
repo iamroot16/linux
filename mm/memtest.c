@@ -48,14 +48,15 @@ static void __init memtest(u64 pattern, phys_addr_t start_phys, phys_addr_t size
 	for (p = start; p < end; p++)
 		*p = pattern;
 
+    // 시작주소 -> 배드1 ... 배드 30 -> 정상2 -> 배드 31 이 나오는 순간 reserve_bad_mem이 수행될 것 같다.
 	for (p = start; p < end; p++, start_phys_aligned += incr) {
-		if (*p == pattern)
+		if (*p == pattern) //< bad checker
 			continue;
-		if (start_phys_aligned == last_bad + incr) {
+		if (start_phys_aligned == last_bad + incr) { //< bad increaser
 			last_bad += incr;
 			continue;
 		}
-		if (start_bad)
+		if (start_bad) //< bad reserver
 			reserve_bad_mem(pattern, start_bad, last_bad + incr);
 		start_bad = last_bad = start_phys_aligned;
 	}
@@ -68,9 +69,11 @@ static void __init do_one_pass(u64 pattern, phys_addr_t start, phys_addr_t end)
 	u64 i;
 	phys_addr_t this_start, this_end;
 
-	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &this_start,
-				&this_end, NULL) {
-		this_start = clamp(this_start, start, end);
+  //for (i = 0, __next_mem_range(&i, nid, flags, type_a, type_b, p_start, p_end, p_nid); i != (u64)ULLONG_MAX; __next_mem_range(&i, nid, flags, type_a, type_b, p_start, p_end, p_nid))
+  //for_each_mem_range(i, &memblock.memory, &memblock.reserved,	nid, flags, p_start, p_end, p_nid)
+  //for_each_free_mem_range(i, nid, flags, p_start, p_end, p_nid)
+	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &this_start, &this_end, NULL) {
+		this_start = clamp(this_start, start, end); ///< this_start 가 0이 나올 수 있을까?
 		this_end = clamp(this_end, start, end);
 		if (this_start < this_end) {
 			pr_info("  %pa - %pa pattern %016llx\n",

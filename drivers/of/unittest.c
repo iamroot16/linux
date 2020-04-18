@@ -2303,7 +2303,7 @@ void __init unittest_unflatten_overlay_base(void)
 		return;
 	}
 
-	new_fdt = dt_alloc_memory(size, roundup_pow_of_two(FDT_V17_SIZE));
+	new_fdt = dt_alloc_memory(size, roundup_pow_of_two(FDT_V17_SIZE)); // < 64byte
 	if (!new_fdt) {
 		pr_err("alloc for dtb 'overlay_base' failed");
 		return;

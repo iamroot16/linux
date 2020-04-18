@@ -26,6 +26,8 @@ static void __init of_numa_parse_cpu_nodes(void)
 	int r;
 	struct device_node *np;
 
+  //for (cpu = of_get_next_cpu_node(NULL); cpu != NULL; cpu = of_get_next_cpu_node(cpu))
+  //for_each_of_cpu_node(cpu)
 	for_each_of_cpu_node(np) {
 		r = of_property_read_u32(np, "numa-node-id", &nid);
 		if (r)
