@@ -305,7 +305,7 @@ static bool populate_node(const void *blob,
 		char *fn;
 		of_node_init(np);
 		np->full_name = fn = ((char *)np) + sizeof(*np);
-결
+
 		memcpy(fn, pathp, l);
 		// 부모, 형제, 자식을 연결
 		if (dad != NULL) {
