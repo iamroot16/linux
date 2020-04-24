@@ -36,6 +36,7 @@ static int numa_distance_cnt;
 static u8 *numa_distance;
 bool numa_off;
 
+// “numa=off” 커널 파라미터가 지정된 경우 전역 변수 numa_off에 true를 대입한다.
 static __init int numa_parse_early_param(char *opt)
 {
 	if (!opt)
@@ -105,15 +106,18 @@ void numa_clear_node(unsigned int cpu)
  * Note: cpumask_of_node() is not valid until after this is done.
  * (Use CONFIG_DEBUG_PER_CPU_MAPS to check this.)
  */
+// 노드 -> cpu 맵을 설정한다.
 static void __init setup_node_to_cpumask_map(void)
 {
 	int node;
 
 	/* setup nr_node_ids if not done yet */
+	// nr_node_ids가 아직 설정되지 않은 경우 possible 노드 수로 지정한다.
 	if (nr_node_ids == MAX_NUMNODES)
 		setup_nr_node_ids();
 
 	/* allocate and clear the mapping */
+	// 노드 수만큼 순회하며 node_to_cpumask_map[node] 비트맵을 할당하고 초기화한다.
 	for (node = 0; node < nr_node_ids; node++) {
 		alloc_bootmem_cpumask_var(&node_to_cpumask_map[node]);
 		cpumask_clear(node_to_cpumask_map[node]);
@@ -208,6 +212,7 @@ void __init setup_per_cpu_areas(void)
  * RETURNS:
  * 0 on success, -errno on failure.
  */
+// memblock 영역에 노드 id를 지정하고  numa_nodes_parsed 비트맵에 현재 노드를 설정한다.
 int __init numa_add_memblk(int nid, u64 start, u64 end)
 {
 	int ret;
@@ -282,24 +287,32 @@ void __init numa_free_distance(void)
  * Create a new NUMA distance table.
  *
  */
+// http://jake.dothome.co.kr/numa-1/
 static int __init numa_alloc_distance(void)
 {
 	size_t size;
 	u64 phys;
 	int i, j;
 
+	// 할당할 사이즈로 노드 수 * 노드 수를 사용한다.
 	size = nr_node_ids * nr_node_ids * sizeof(numa_distance[0]);
+	// memblock의 빈 공간에서 size 만큼의 공간을 페이지 단위로 알아온다.
 	phys = memblock_find_in_range(0, PFN_PHYS(max_pfn),
 				      size, PAGE_SIZE);
 	if (WARN_ON(!phys))
 		return -ENOMEM;
 
+	// size 영역을 memblock에 reserve 한다.
 	memblock_reserve(phys, size);
 
+	// 할당한 물리 주소를 가상 주소로 변환하여 numa_distance에 대입하고, 노드 수를 지정한다.
 	numa_distance = __va(phys);
 	numa_distance_cnt = nr_node_ids;
 
 	/* fill with the default distances */
+	// numa_distance[]는 논리적으로 이중 배열을 표현하였다. 
+	// 디폴트 numa_distance[] 값으로 같은 노드를 의미하는 경우에만 LOCAL_DISTANCE(10)를 지정하고 
+	// 그 외의 경우는 REMOTE_DISTANCE(20) 값을 지정해둔다.
 	for (i = 0; i < numa_distance_cnt; i++)
 		for (j = 0; j < numa_distance_cnt; j++)
 			numa_distance[i * numa_distance_cnt + j] = i == j ?
@@ -323,6 +336,7 @@ static int __init numa_alloc_distance(void)
  * or @distance doesn't make sense, the call is ignored.
  *
  */
+// numa distace를 설정한다.
 void __init numa_set_distance(int from, int to, int distance)
 {
 	if (!numa_distance) {
@@ -344,6 +358,7 @@ void __init numa_set_distance(int from, int to, int distance)
 		return;
 	}
 
+	// 배열에 distance 값을 지정한다.
 	numa_distance[from * numa_distance_cnt + to] = distance;
 }
 
@@ -358,12 +373,14 @@ int __node_distance(int from, int to)
 }
 EXPORT_SYMBOL(__node_distance);
 
+// 노드 데이터(struct pglist_data)를 할당하고 기본 노드 정보를 설정한다.
 static int __init numa_register_nodes(void)
 {
 	int nid;
 	struct memblock_region *mblk;
 
 	/* Check that valid nid is set to memblks */
+	// memblock에 노드가 지정되지 않은 경우 경고 메시지를 출력하고 에러 -EINVAL 값을 반환한다.
 	for_each_memblock(memory, mblk)
 		if (mblk->nid == NUMA_NO_NODE || mblk->nid >= MAX_NUMNODES) {
 			pr_warn("Warning: invalid memblk node %d [mem %#010Lx-%#010Lx]\n",
@@ -373,15 +390,18 @@ static int __init numa_register_nodes(void)
 		}
 
 	/* Finally register nodes. */
+	// 노드를 순회하며 노드 데이터(struct pglist_data)를 할당하고 노드의 기본 정보를 설정한다.
 	for_each_node_mask(nid, numa_nodes_parsed) {
 		unsigned long start_pfn, end_pfn;
 
 		get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 		setup_node_data(nid, start_pfn, end_pfn);
+		// 해당 노드를 online 상태로 설정한다.
 		node_set_online(nid);
 	}
 
 	/* Setup online nodes to actual nodes*/
+	// online 노드들을 possible 맵에 지정한다.
 	node_possible_map = numa_nodes_parsed;
 
 	return 0;
@@ -391,28 +411,34 @@ static int __init numa_init(int (*init_func)(void))
 {
 	int ret;
 
+	// NUMA 상태를 관리하는 비트맵들을 모두 초기화한다.
 	nodes_clear(numa_nodes_parsed);
 	nodes_clear(node_possible_map);
 	nodes_clear(node_online_map);
 
+	// numa_disatance[] 배열을 필요한 만큼 할당하고 초기 값들을 지정한다.
 	ret = numa_alloc_distance();
 	if (ret < 0)
 		return ret;
 
+	// 인자로 받은 함수 @init_func을 실행시켜 설정한다.
 	ret = init_func();
 	if (ret < 0)
 		goto out_free_distance;
 
+	// 노드 정보가 하나도 없는 경우 “No NUMA configuration found” 메시지를 출력하고 빠져나간다.
 	if (nodes_empty(numa_nodes_parsed)) {
 		pr_info("No NUMA configuration found\n");
 		ret = -EINVAL;
 		goto out_free_distance;
 	}
 
+	// 노드 데이터(struct pglist_data)를 할당하고 기본 노드 정보를 설정한다.
 	ret = numa_register_nodes();
 	if (ret < 0)
 		goto out_free_distance;
 
+	// 노드 -> cpu 맵을 설정한다.
 	setup_node_to_cpumask_map();
 
 	return 0;
@@ -430,17 +456,21 @@ out_free_distance:
  * Must online at least one node (node 0) and add memory blocks that cover all
  * allowed memory. It is unlikely that this function fails.
  */
+// NUMA 설정이 없는 경우 한 개의 노드로 구성된 dummy NUMA 구성으로 초기화한다.
 static int __init dummy_numa_init(void)
 {
 	int ret;
 	struct memblock_region *mblk;
 
+	// “numa=off” 커널 파라미터가 지정된 경우 “NUMA disabled” 메시지를 출력한다.
 	if (numa_off)
 		pr_info("NUMA disabled\n"); /* Forced off on command line. */
+	// “Faking a node at …” 메시지 정보를 통해 한 개의 메모리 정보를 출력한다.
 	pr_info("Faking a node at [mem %#018Lx-%#018Lx]\n",
 		memblock_start_of_DRAM(), memblock_end_of_DRAM() - 1);
 
 	for_each_memblock(memory, mblk) {
+		// memory memblock 모두에 0번 노드를 지정한다.
 		ret = numa_add_memblk(0, mblk->base, mblk->base + mblk->size);
 		if (!ret)
 			continue;
@@ -449,6 +479,7 @@ static int __init dummy_numa_init(void)
 		return ret;
 	}
 
+	// NUMA가 disable 되었음을 나타낸다.
 	numa_off = true;
 	return 0;
 }

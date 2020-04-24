@@ -463,11 +463,15 @@ void __init bootmem_init(void)
 	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
 	 * done after the fixed reservations.
 	 */
+	// 각 메모리 모델의 관리를 위해 필요한 데이터를 초기화한다.
+	// sparse memory 모델의 경우 memblock에 등록된 모든 메모리 블록에 대해 섹션별로 메모리가 존재하는 곳의 mem_section을 초기화한다.
 	memblocks_present();
-
+	// Sparse memory 모델을 사용하는 시스템을 위해 관리 영역을 할당받고 매핑 초기화한다
 	sparse_init();
+	//  존별로 메모리 영역을 지정하고 초기화한다.
 	zone_sizes_init(min, max);
 
+	// “memblock=debug” 커널 파라메터가 주어진 경우 memblock 상태를 덤프한다.
 	memblock_dump_all();
 }
 
