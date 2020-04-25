@@ -112,6 +112,9 @@ EXPORT_SYMBOL(latent_entropy);
 /*
  * Array of node states.
  */
+/*
+[0], [1], [2], [3]
+*/
 nodemask_t node_states[NR_NODE_STATES] __read_mostly = {
 	[N_POSSIBLE] = NODE_MASK_ALL,
 	[N_ONLINE] = { { [0] = 1UL } },

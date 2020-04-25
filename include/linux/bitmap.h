@@ -202,6 +202,15 @@ extern int bitmap_print_to_pagebuf(bool list, char *buf,
 				   const unsigned long *maskp, int nmaskbits);
 
 #define BITMAP_FIRST_WORD_MASK(start) (~0UL << ((start) & (BITS_PER_LONG - 1)))
+/* 4  = 0b 0000_..._0000_0100 
+   -4 = 0b 1111_..._1111_1100
+
+   63 = 0b 0000_..._0011_1111
+
+   60 -> 0b 0000_..._0011_1100
+
+   BITMAP_LAST_WORD_MASK(4) = 15
+*/
 #define BITMAP_LAST_WORD_MASK(nbits) (~0UL >> (-(nbits) & (BITS_PER_LONG - 1)))
 
 /*

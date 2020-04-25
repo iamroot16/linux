@@ -4,7 +4,11 @@
 #include <asm/types.h>
 #include <linux/bits.h>
 
+
 #define BITS_PER_TYPE(type) (sizeof(type) * BITS_PER_BYTE)
+// BIT_PER_TYPE(long) sizeof(long) * 8 = 64
+// BITS_TO_LONGS(4) DIV_ROUND_UP(4, 64) = 1
+
 #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_TYPE(long))
 
 extern unsigned int __sw_hweight8(unsigned int w);

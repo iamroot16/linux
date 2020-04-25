@@ -95,6 +95,8 @@
 #include <linux/bitmap.h>
 #include <linux/numa.h>
 
+// MAX_NUMNODES 4
+// bits[1] 생성
 typedef struct { DECLARE_BITMAP(bits, MAX_NUMNODES); } nodemask_t;
 extern nodemask_t _unused_nodemask_arg_;
 
@@ -304,8 +306,11 @@ static inline int __first_unset_node(const nodemask_t *maskp)
 
 #define NODE_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(MAX_NUMNODES)
 
+// MAX_NUMNODES 4, BITS_PER_LONG 64
 #if MAX_NUMNODES <= BITS_PER_LONG
 
+// BITS_TO_LONGS(MAX_NUMNODES)-1 = 0
+// NODE_MASK_LAST_WORD = 0b1111 (15)
 #define NODE_MASK_ALL							\
 ((nodemask_t) { {							\
 	[BITS_TO_LONGS(MAX_NUMNODES)-1] = NODE_MASK_LAST_WORD		\

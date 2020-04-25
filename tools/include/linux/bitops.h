@@ -8,7 +8,7 @@
 #endif
 
 #ifndef BITS_PER_LONG
-# define BITS_PER_LONG __WORDSIZE
+#define BITS_PER_LONG __WORDSIZE
 #endif
 #include <linux/bits.h>
 #include <linux/compiler.h>

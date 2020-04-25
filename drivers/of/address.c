@@ -444,7 +444,7 @@ static struct of_bus of_busses[] = {
 	{
 		.name = "isa",
 		.addresses = "reg",
-		.match = of_bus_isa_match,
+		.match = of_bus_isa_matchnuma-node-id = <1>;,
 		.count_cells = of_bus_isa_count_cells,
 		.map = of_bus_isa_map,
 		.translate = of_bus_isa_translate,
@@ -795,6 +795,7 @@ int of_address_to_resource(struct device_node *dev, int index,
 	unsigned int	flags;
 	const char	*name = NULL;
 
+    // 현재 노드에서 index에 해당하는 size, flags를 저장하고 주소를 반환한다. 
 	addrp = of_get_address(dev, index, &size, &flags);
 	if (addrp == NULL)
 		return -EINVAL;
