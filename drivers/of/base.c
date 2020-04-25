@@ -63,7 +63,10 @@ bool of_node_name_eq(const struct device_node *np, const char *name)
 	if (!np)
 		return false;
 
+	// "/cpus/cpu@0" 
 	node_name = kbasename(np->full_name);
+
+	// "cpu@0" -> "cpu" 까지 길이임.
 	len = strchrnul(node_name, '@') - node_name;
 
 	return (strlen(name) == len) && (strncmp(node_name, name, len) == 0);
@@ -822,6 +825,19 @@ struct device_node *of_get_next_cpu_node(struct device_node *prev)
 		of_node_put(node);
 	}
 	for (; next; next = next->sibling) {
+
+		/*
+		 * of_node_name_eq : cpu@0
+		 * 
+		 * of_node_name_eq : device_type = "cpu";
+		 * 
+		 * cpu0: cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			enable-method = "psci";
+			reg = <0x000>;
+		}
+		 */
 		if (!(of_node_name_eq(next, "cpu") ||
 		      __of_node_is_type(next, "cpu")))
 			continue;

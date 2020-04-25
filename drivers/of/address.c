@@ -707,6 +707,8 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 	bus = of_match_bus(parent);
 	bus->count_cells(dev, &na, &ns);
 	of_node_put(parent);
+
+	// 1 <= na <= 4 만족해야함!
 	if (!OF_CHECK_ADDR_COUNT(na))
 		return NULL;
 
