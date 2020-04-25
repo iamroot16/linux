@@ -417,20 +417,14 @@ static int __init numa_init(int (*init_func)(void))
 {
 	int ret;
 
-<<<<<<< Updated upstream
 	// NUMA 상태를 관리하는 비트맵들을 모두 초기화한다.
-=======
     // 세개의 배열을 0으로 초기화 한다.
->>>>>>> Stashed changes
 	nodes_clear(numa_nodes_parsed);
 	nodes_clear(node_possible_map);
 	nodes_clear(node_online_map);
 
-<<<<<<< Updated upstream
 	// numa_disatance[] 배열을 필요한 만큼 할당하고 초기 값들을 지정한다.
-=======
     // distance map을 초기화한다.
->>>>>>> Stashed changes
 	ret = numa_alloc_distance();
 	if (ret < 0)
 		return ret;
