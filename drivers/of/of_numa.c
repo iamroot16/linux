@@ -20,6 +20,7 @@
  * Even though we connect cpus to numa domains later in SMP
  * init, we need to know the node ids now for all cpus.
 */
+// cpu 노드 수만큼 순회하며 노드를 파싱한다.
 static void __init of_numa_parse_cpu_nodes(void)
 {
 	u32 nid;
@@ -28,6 +29,7 @@ static void __init of_numa_parse_cpu_nodes(void)
 
   //for (cpu = of_get_next_cpu_node(NULL); cpu != NULL; cpu = of_get_next_cpu_node(cpu))
   //for_each_of_cpu_node(cpu)
+  // “numa-node-id” 속성이 1 이상인 경우 numa_nodes_parsed 비트맵에 노드를 설정한다.
 	for_each_of_cpu_node(np) {
 		r = of_property_read_u32(np, "numa-node-id", &nid);
 		if (r)
@@ -41,6 +43,7 @@ static void __init of_numa_parse_cpu_nodes(void)
 	}
 }
 
+// memory 노드 수만큼 순회하며 노드를 파싱하여 memblock에 노드를 기록한다.
 static int __init of_numa_parse_memory_nodes(void)
 {
 	struct device_node *np = NULL;
@@ -48,6 +51,7 @@ static int __init of_numa_parse_memory_nodes(void)
 	u32 nid;
 	int i, r;
 
+	// “numa-node-id” 속성이 있는 메모리 노드인 경우 그 영역의 memblock에 노드 정보를 기록한다.
 	for_each_node_by_type(np, "memory") {
 		r = of_property_read_u32(np, "numa-node-id", &nid);
 		if (r == -EINVAL)
@@ -76,6 +80,7 @@ static int __init of_numa_parse_memory_nodes(void)
 	return 0;
 }
 
+// distance 맵을 파싱하여 온다.
 static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 {
 	const __be32 *matrix;
@@ -84,6 +89,7 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 
 	pr_info("parsing numa-distance-map-v1\n");
 
+	// “distance-matrix” 속성 값을 읽는다
 	matrix = of_get_property(map, "distance-matrix", NULL);
 	if (!matrix) {
 		pr_err("No distance-matrix property in distance-map\n");
@@ -96,6 +102,7 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 		return -EINVAL;
 	}
 
+	// numa_distance[] 배열에 값을 지정한다.
 	for (i = 0; i + 2 < entry_count; i += 3) {
 		u32 nodea, nodeb, distance;
 
@@ -174,6 +181,7 @@ int of_node_to_nid(struct device_node *device)
 	return NUMA_NO_NODE;
 }
 
+// 디바이스 트리를 통해 cpu 노드와 memory 노드에서 누마 id를 읽어 설정하고, distance 맵을 파싱해온다.
 int __init of_numa_init(void)
 {
 	int r;

@@ -78,18 +78,23 @@ static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 	return section;
 }
 
+// CONFIG_SPARSEMEM_EXTREME 커널 옵션을 사용하는 경우 dynamic하게 mem_section 테이블을 할당 받아 구성한다.
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
+	// 섹션 번호로 루트 번호를 구한다
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
 	struct mem_section *section;
 
+	// 해당 루트 인덱스의 루트 섹션에 값이 존재하는 경우 이미 mem_section[] 테이블이 구성되었으므로 함수를 빠져나간다.
 	if (mem_section[root])
 		return -EEXIST;
 
+	// 해당 노드에서 2 단계용 섹션 테이블을 할당받아 구성한다. 핫플러그 메모리를 위해 각 mem_section[] 테이블은 해당 노드에 위치해야 한다.
 	section = sparse_index_alloc(nid);
 	if (!section)
 		return -ENOMEM;
 
+	// 루트 번호에 해당하는 1단계 mem_section[] 포인터 배열에 새로 할당받은 2 단계 mem_section[] 테이블의 시작 주소를 설정한다.
 	mem_section[root] = section;
 
 	return 0;
@@ -144,6 +149,7 @@ static inline int sparse_early_nid(struct mem_section *section)
 }
 
 /* Validate the physical addressing limitations of the model */
+// 인자로 사용된 시작 pfn, 끝 pfn 값이 물리 메모리 주소 최대 pfn 값을 초과하지 않도록 제한한다.
 void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 						unsigned long *end_pfn)
 {
@@ -153,6 +159,8 @@ void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 	 * Sanity checks - do not allow an architecture to pass
 	 * in larger pfns than the maximum scope of sparsemem:
 	 */
+	// 시작 pfn이 max_sparsemem_pfn보다 크면 경고를 출력하고, 
+	// start_pfn과 end_pfn에 max_sparsemem_pfn을 설정한다.
 	if (*start_pfn > max_sparsemem_pfn) {
 		mminit_dprintk(MMINIT_WARNING, "pfnvalidation",
 			"Start of range %lu -> %lu exceeds SPARSEMEM max %lu\n",
@@ -160,7 +168,7 @@ void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 		WARN_ON_ONCE(1);
 		*start_pfn = max_sparsemem_pfn;
 		*end_pfn = max_sparsemem_pfn;
-	} else if (*end_pfn > max_sparsemem_pfn) {
+	} else if (*end_pfn > max_sparsemem_pfn) { // 끝 pfn이 max_sparsemem_pfn보다 크면 경고를 출력하고, end_pfn에 max_sparsemem_pfn을 설정한다.
 		mminit_dprintk(MMINIT_WARNING, "pfnvalidation",
 			"End of range %lu -> %lu exceeds SPARSEMEM max %lu\n",
 			*start_pfn, *end_pfn, max_sparsemem_pfn);
@@ -211,10 +219,13 @@ static inline unsigned long first_present_section_nr(void)
 }
 
 /* Record a memory area against a node. */
+// http://jake.dothome.co.kr/sparsemem/
 void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
 	unsigned long pfn;
 
+// CONFIG_SPARSEMEM_EXTREME 커널 옵션을 사용하는 경우 
+// 처음 mem_section이 초기화되지 않은 경우 mem_section[] 배열을 생성한다
 #ifdef CONFIG_SPARSEMEM_EXTREME
 	if (unlikely(!mem_section)) {
 		unsigned long size, align;
@@ -228,15 +239,27 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 	}
 #endif
 
+	// 요청한 범위의 시작 pfn을 섹션 단위로 내림 정렬한 주소로 변환한 후 
+	// 해당 범위의 pfn이 실제로 지정할 수 있는 물리 메모리 범위에 포함되는지 검증하고 초과 시 그 주소를 강제로 제한한다.
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
+	// 시작 pfn부터 섹션 단위로 증가시키며 이 값으로 section 번호를 구한다.
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);
 		struct mem_section *ms;
 
+		// CONFIG_SPARSEMEM_EXTREME 커널 옵션을 사용하는 경우에만 동작하며, 
+		// 이 함수에서 해당 섹션에 대한 mem_section[]을 동적으로(dynamic) 할당받는다. 
+		// CONFIG_SPARSEMEM_STATIC 커널 옵션을 사용하는 경우에는 이미 정적(static) 배열이 준비되어 있으므로 
+		// 아무런 동작도 요구되지 않는다
 		sparse_index_init(section, nid);
+		// NODE_NOT_IN_PAGE_FLAGS가 정의된 경우 
+		// 별도의 전역 section_to_node_table[] 배열에 해당 섹션을 인덱스로 해당 노드 id를 가리키게 한다.
+		// NODE_NOT_IN_PAGE_FLAGS 커널 옵션은 page 구조체의 flags 필드에 노드 번호를 저장할 비트가 
+		// 부족한 32비트 아키텍처에서 사용되는 옵션이다.
 		set_section_nid(section, nid);
 
+		// 해당 섹션의 mem_section 구조체내의 section_mem_map에 노드 id와 online 및 present 플래그를 설정한다.
 		ms = __nr_to_section(section);
 		if (!ms->section_mem_map) {
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
