@@ -294,12 +294,9 @@ static int __init numa_alloc_distance(void)
 	u64 phys;
 	int i, j;
 
-<<<<<<< Updated upstream
 	// 할당할 사이즈로 노드 수 * 노드 수를 사용한다.
-=======
-    // nr_node_ids = 4
-    // size = 4*4*1 = 16
->>>>>>> Stashed changes
+	// nr_node_ids = 4
+	// size = 4*4*1 = 16
 	size = nr_node_ids * nr_node_ids * sizeof(numa_distance[0]);
 	// memblock의 빈 공간에서 size 만큼의 공간을 페이지 단위로 알아온다.
 	// memblock 공간에서 가장 마지막 페이지를 가르킴

@@ -444,7 +444,7 @@ static struct of_bus of_busses[] = {
 	{
 		.name = "isa",
 		.addresses = "reg",
-		.match = of_bus_isa_matchnuma-node-id = <1>;,
+		.match = of_bus_isa_match,
 		.count_cells = of_bus_isa_count_cells,
 		.map = of_bus_isa_map,
 		.translate = of_bus_isa_translate,
