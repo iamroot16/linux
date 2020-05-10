@@ -82,6 +82,7 @@ static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
 	// 섹션 번호로 루트 번호를 구한다
+    // root = section_nr / SECTION_PER_ROOT(==256)
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
 	struct mem_section *section;
 
@@ -138,6 +139,7 @@ int __section_nr(struct mem_section* ms)
  * node.  This keeps us from having to use another data structure.  The
  * node information is cleared just before we store the real mem_map.
  */
+// SECTION_NID_SHIFT = 3
 static inline unsigned long sparse_encode_early_nid(int nid)
 {
 	return (nid << SECTION_NID_SHIFT);
@@ -153,6 +155,7 @@ static inline int sparse_early_nid(struct mem_section *section)
 void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 						unsigned long *end_pfn)
 {
+    // max_sparsemem_pfn = 1UL << 36 = 64G
 	unsigned long max_sparsemem_pfn = 1UL << (MAX_PHYSMEM_BITS-PAGE_SHIFT);
 
 	/*
@@ -226,12 +229,19 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 // CONFIG_SPARSEMEM_EXTREME 커널 옵션을 사용하는 경우 
 // 처음 mem_section이 초기화되지 않은 경우 mem_section[] 배열을 생성한다
+
+// mem_section은 이중 포인터(논리적으로, 2차 배열)로 구성되어 있음
+// mem_section index 크기 : NR_SECTION_ROOTS * SECTION_PER_ROOT
+// NR_SECTION_ROOTS = 1024
+// SECTION_PER_ROOT = 256 (See mmzone.h)
 #ifdef CONFIG_SPARSEMEM_EXTREME
 	if (unlikely(!mem_section)) {
 		unsigned long size, align;
 
 		size = sizeof(struct mem_section*) * NR_SECTION_ROOTS;
+        // INTERNODE_CACHE_SHIFT = 6 
 		align = 1 << (INTERNODE_CACHE_SHIFT);
+        // size = 8K, align = 64
 		mem_section = memblock_alloc(size, align);
 		if (!mem_section)
 			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
@@ -241,6 +251,8 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 	// 요청한 범위의 시작 pfn을 섹션 단위로 내림 정렬한 주소로 변환한 후 
 	// 해당 범위의 pfn이 실제로 지정할 수 있는 물리 메모리 범위에 포함되는지 검증하고 초과 시 그 주소를 강제로 제한한다.
+    
+    // start를 section 단위(PAGE_PER_SECTION)에 맞춰 내림 (PAGE_SECTION_MASK = (~(256K-1)))
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
 	// 시작 pfn부터 섹션 단위로 증가시키며 이 값으로 section 번호를 구한다.
@@ -260,8 +272,12 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 		set_section_nid(section, nid);
 
 		// 해당 섹션의 mem_section 구조체내의 section_mem_map에 노드 id와 online 및 present 플래그를 설정한다.
+ 
+        //  SECTION_IS_ONLINE   (1UL<<2)
+
 		ms = __nr_to_section(section);
 		if (!ms->section_mem_map) {
+            // ms->section_mem_map = nid <<3 | 1UL << 2
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
 							SECTION_IS_ONLINE;
 			section_mark_present(ms);
