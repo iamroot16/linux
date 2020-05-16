@@ -1080,6 +1080,14 @@ static inline unsigned long early_pfn_to_nid(unsigned long pfn)
  * PA_SECTION_SHIFT		physical address to/from section number
  * PFN_SECTION_SHIFT		pfn to/from section number
  */
+
+// SECTION_SIZE_BITS = 30
+// PAGE_SHIFT = 12
+//
+// => PFN_SECTION_SHIFT = 18
+// => PAGES_PER_SECTION = 256K
+// => PAGE_SECTION_MASK = (~(256K-1)) => 하위 18 bit가 0 ([63:18] = 1, [17:0] = 0)
+
 #define PA_SECTION_SHIFT	(SECTION_SIZE_BITS)
 #define PFN_SECTION_SHIFT	(SECTION_SIZE_BITS - PAGE_SHIFT)
 
@@ -1097,6 +1105,7 @@ static inline unsigned long early_pfn_to_nid(unsigned long pfn)
 
 static inline unsigned long pfn_to_section_nr(unsigned long pfn)
 {
+    // pfn을 section number로 바꾸어 반환
 	return pfn >> PFN_SECTION_SHIFT;
 }
 static inline unsigned long section_nr_to_pfn(unsigned long sec)
@@ -1147,6 +1156,27 @@ struct mem_section {
 #endif
 
 #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT)
+
+// #define NR_SECTION_ROOTS    DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
+// #define NR_MEM_SECTIONS     (1UL << SECTIONS_SHIFT)
+// #define SECTIONS_SHIFT  (MAX_PHYSMEM_BITS - SECTION_SIZE_BITS)
+// #define MAX_PHYSMEM_BITS    CONFIG_ARM64_PA_BITS
+// config ARM64_PA_BITS
+//    default 48 if ARM64_PA_BITS_48
+
+// #define SECTION_SIZE_BITS   30
+
+// #define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
+// PAGE_SIZE = 4K
+// sizeof (struct mem_section) = 16B
+
+//==========================================================================
+
+// SECTION_SHIFT = 48 - 30 = 18
+// NR_MEM_SECTIONS = 1 << 18 = 256K
+// SECTIONS_PER_ROOT = 4K / 16B = 256
+// NR_SECTION_ROOTS = 1024
+
 #define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
 #define SECTION_ROOT_MASK	(SECTIONS_PER_ROOT - 1)
 
