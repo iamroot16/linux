@@ -251,6 +251,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 	/* report and initialize */
 	pr_info("NODE_DATA [mem %#010Lx-%#010Lx]\n",
 		nd_pa, nd_pa + nd_size - 1);
+    // tnid가 의미하는 것은 정확히 파악되지 않음
 	tnid = early_pfn_to_nid(nd_pa >> PAGE_SHIFT);
 	if (tnid != nid)
 		pr_info("NODE_DATA(%d) on node %d\n", nid, tnid);

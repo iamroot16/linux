@@ -1224,6 +1224,7 @@ void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 	while (++*idx < type->cnt) {
 		r = &type->regions[*idx];
 
+        // 온전히 하나 이상의 페이지 프레임을 구할 수 없는 경우 아래 조건이 참
 		if (PFN_UP(r->base) >= PFN_DOWN(r->base + r->size))
 			continue;
 		if (nid == MAX_NUMNODES || nid == r->nid)
