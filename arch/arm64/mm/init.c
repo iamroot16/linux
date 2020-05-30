@@ -179,6 +179,17 @@ static void __init reserve_elfcorehdr(void)
  * currently assumes that for memory starting above 4G, 32-bit devices will
  * use a DMA offset.
  */
+/*
+ *	2GB 인 경우 
+ *	offset = 0
+ *	min(0+4GB , 2GB)
+ *	ret = 2GB
+ *
+ *	6GB
+ *	offset = 4GB
+ *	min(4+4GB, 6GB)
+ */
+
 static phys_addr_t __init max_zone_dma_phys(void)
 {
 	phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
@@ -189,9 +200,14 @@ static phys_addr_t __init max_zone_dma_phys(void)
 
 static void __init zone_sizes_init(unsigned long min, unsigned long max)
 {
+	// MAX_NR_ZONES DEFINE이라는 MACRO 함수를 통해서 KBUILD에서 어딘가 DEFINE을 해준다.
+	// MAX_NR_ZONES := 3
+	// 
 	unsigned long max_zone_pfns[MAX_NR_ZONES]  = {0};
 
+	// 32비트 주소만 접근 기능한 DMA(Direct Memory Access) 디바이스를 운용하는 경우 이 영역을 이용할 수 있다. 대부분의 ARM64 시스템은 ZONE_DMA32 영역을 이용하지 않는다. 그러나 default는 되어있다.
 	if (IS_ENABLED(CONFIG_ZONE_DMA32))
+		// http://jake.dothome.co.kr/bootmem_init-64/ 그림 참조!! 
 		max_zone_pfns[ZONE_DMA32] = PFN_DOWN(max_zone_dma_phys());
 	max_zone_pfns[ZONE_NORMAL] = max;
 

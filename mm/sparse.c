@@ -325,14 +325,19 @@ struct page *sparse_decode_mem_map(unsigned long coded_mem_map, unsigned long pn
 	return ((struct page *)coded_mem_map) + section_nr_to_pfn(pnum);
 }
 
+/*
+ * sparse_init_one_section   545  sparse_init_one_section(__nr_to_section(pnum), pnum, map, usemap)
+ */
+
 static void __meminit sparse_init_one_section(struct mem_section *ms,
 		unsigned long pnum, struct page *mem_map,
 		unsigned long *pageblock_bitmap)
 {
-	ms->section_mem_map &= ~SECTION_MAP_MASK;
+	ms->section_mem_map &= ~SECTION_MAP_MASK; // *** &= 0b111
 	ms->section_mem_map |= sparse_encode_mem_map(mem_map, pnum) |
-							SECTION_HAS_MEM_MAP;
- 	ms->pageblock_flags = pageblock_bitmap;
+							SECTION_HAS_MEM_MAP; // *** |= encoded_stuff | 2
+ 	ms->pageblock_flags = pageblock_bitmap; // usemap -> page_block_flags로 넣어준다.
+	// pageblock_flags는 usemap을 가리키는 주소이다.
 }
 
 unsigned long usemap_size(void)
@@ -376,6 +381,10 @@ again:
 	}
 	return p;
 }
+
+/*
+*  check_usemap_section_nr   540  check_usemap_section_nr(nid, usemap)
+*/
 
 static void __init check_usemap_section_nr(int nid, unsigned long *usemap)
 {
@@ -478,11 +487,16 @@ static void __init sparse_buffer_init(unsigned long size, int nid)
 	sparsemap_buf_end = sparsemap_buf + size;
 }
 
+/*
+ * sparse_buffer_fini (finish아닐까 생각함)
+ * sparse햇던 sparsemap_buf 에 대해서 유효한지 체크하고
+ * memblock을 할당해제한다.
+ */
 static void __init sparse_buffer_fini(void)
 {
 	unsigned long size = sparsemap_buf_end - sparsemap_buf;
 
-	if (sparsemap_buf && size > 0)
+	if (sparsemap_buf && size > 0) // 유효체크 
 		memblock_free_early(__pa(sparsemap_buf), size);
 	sparsemap_buf = NULL;
 }
@@ -508,13 +522,14 @@ void __weak __meminit vmemmap_populate_print_last(void)
 /*
  * Initialize sparse on a specific node. The node spans [pnum_begin, pnum_end)
  * And number of present sections in this node is map_count.
+usemap : memory allign ? 할때 연속된 공간을 확보하기위한 사전정보
  */
 static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 				   unsigned long pnum_end,
 				   unsigned long map_count)
 {
 	unsigned long pnum, usemap_longs, *usemap;
-	struct page *map;
+	struct page *map
 
 	usemap_longs = BITS_TO_LONGS(SECTION_BLOCKFLAGS_BITS);
 	usemap = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nid),
@@ -536,7 +551,8 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 			pnum_begin = pnum;
 			goto failed;
 		}
-		check_usemap_section_nr(nid, usemap);
+		check_usemap_section_nr(nid, usemap); // default로 비어있는 함수로 실행되기에 아무것도 수행되지 않는다.
+		// for_each를 돌때마다 *usemap 과 pnum이 각각 가산되서 init을 한다.
 		sparse_init_one_section(__nr_to_section(pnum), pnum, map, usemap);
 		usemap += usemap_longs;
 	}
@@ -544,6 +560,10 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	return;
 failed:
 	/* We failed to allocate, mark all the following pnums as not present */
+	/*
+	 * 1. usemap이 없는겨우
+	 * 2. for each를 돌다가 특정 nid에 대한 memory map을 가져오는데 실패한경우
+	 */
 	for_each_present_section_nr(pnum_begin, pnum) {
 		struct mem_section *ms;
 
@@ -552,6 +572,9 @@ failed:
 		ms = __nr_to_section(pnum);
 		ms->section_mem_map = 0;
 	}
+	/*
+	 * 실패하면 memsection에 메모리가 없다고 0으로 flag를 clear한다.
+	 */
 }
 
 /*
@@ -575,13 +598,16 @@ void __init sparse_init(void)
 			continue;
 		}
 		/* Init node with sections in range [pnum_begin, pnum_end) */
+		// for_each_present_section_nr(pnum_begin, pnum) 
+		// for_each로 sparse할때에 겉에서는 전체를 보고 요기 아래서는 같은 nid끼리 처리를 한다.
 		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
 		nid_begin = nid;
 		pnum_begin = pnum_end;
 		map_count = 1;
+		// nid_begin ... map_count까지는 sparse_init_nid에서 처리했던 nid의 다음 nid를 위한 초기화를 진행한다.
 	}
 	/* cover the last node */
-	sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
+	sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count); // 마지막 nid는 손수 sparse하는데 nid_beging을 마지막에 건들진 않는다.
 	vmemmap_populate_print_last();
 }
 

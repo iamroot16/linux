@@ -1471,7 +1471,9 @@ void * __init memblock_alloc_try_nid_raw(
 
 	ptr = memblock_alloc_internal(size, align,
 					   min_addr, max_addr, nid);
+	// 정상적으로 할당 되었는지 확인한다.
 	if (ptr && size > 0)
+		// 일반적인 휘발된 메모리는 0으로 clear되어있으니 전부다 1 로 Set해준다.
 		page_init_poison(ptr, size);
 
 	return ptr;
