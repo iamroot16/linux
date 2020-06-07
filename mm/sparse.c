@@ -529,7 +529,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 				   unsigned long map_count)
 {
 	unsigned long pnum, usemap_longs, *usemap;
-	struct page *map
+	struct page *map;
 
 	usemap_longs = BITS_TO_LONGS(SECTION_BLOCKFLAGS_BITS);
 	usemap = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nid),

@@ -6771,6 +6771,7 @@ static u64 zero_pfn_range(unsigned long spfn, unsigned long epfn)
 	u64 pgcnt = 0;
 
 	for (pfn = spfn; pfn < epfn; pfn++) {
+		// PFN이 invalid하면, pageblock_nr_pages는 다시 valid check하지 않고 건너뜀
 		if (!pfn_valid(ALIGN_DOWN(pfn, pageblock_nr_pages))) {
 			pfn = ALIGN_DOWN(pfn, pageblock_nr_pages)
 				+ pageblock_nr_pages - 1;
@@ -6795,6 +6796,7 @@ static u64 zero_pfn_range(unsigned long spfn, unsigned long epfn)
  * memblock.memory or memblock.reserved. That could happen when memblock
  * layout is manually configured via memmap=.
  */
+// memory memblock이 커버하지 않는 홀을 포함하여 사용하지 않는 메모리 공간을 관리하는 page 구조체 내용을 0으로 채운다.
 void __init zero_resv_unavail(void)
 {
 	phys_addr_t start, end;
@@ -6807,10 +6809,12 @@ void __init zero_resv_unavail(void)
 	pgcnt = 0;
 	for_each_mem_range(i, &memblock.memory, NULL,
 			NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end, NULL) {
+		// zero from next to start (until just before memblock.memory pfn)
 		if (next < start)
 			pgcnt += zero_pfn_range(PFN_DOWN(next), PFN_UP(start));
 		next = end;
 	}
+	// zero from the end of the last memory.memory pfn to max pfn
 	pgcnt += zero_pfn_range(PFN_DOWN(next), max_pfn);
 
 	/*
@@ -6941,7 +6945,7 @@ static unsigned long __init early_calculate_totalpages(void)
  * Find the PFN the Movable zone begins in each node. Kernel memory
  * is spread evenly between nodes as long as the nodes have enough
  * memory. When they don't, some nodes will have more kernelcore than
- * others
+ * other
  */
 static void __init find_zone_movable_pfns_for_nodes(void)
 {
@@ -6955,12 +6959,14 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	struct memblock_region *r;
 
 	/* Need to find movable_zone earlier when movable_node is specified. */
+	// ARM64 defconfig에서는 ZONE_NORMAL의 zone_index(1)가 movable_zone이 된다
 	find_usable_zone_for_movable();
 
 	/*
 	 * If movable_node is specified, ignore kernelcore and movablecore
 	 * options.
 	 */
+	// CONFIG_MEMORY_HOTPLUG을 사용하지 않으므로, FALSE
 	if (movable_node_is_enabled()) {
 		for_each_memblock(memory, r) {
 			if (!memblock_is_hotpluggable(r))
@@ -6989,13 +6995,17 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 
 			nid = r->nid;
 
+			// region에서 가장 낮은 사용 가능한 PFN을 리턴 
 			usable_startpfn = memblock_region_memory_base_pfn(r);
 
-			if (usable_startpfn < 0x100000) {
+			// mirrored_kernelcore 이면서 PFN이 4GB 미만 위치 인지 검사
+			if (usable_startpfn < 0x100000) { 
 				mem_below_4gb_not_mirrored = true;
 				continue;
 			}
-
+			
+			// 노드별로 모든 region에서 가장 작은 usable_startpfn으로
+			// zone_movable_pfn을 설정
 			zone_movable_pfn[nid] = zone_movable_pfn[nid] ?
 				min(usable_startpfn, zone_movable_pfn[nid]) :
 				usable_startpfn;
@@ -7011,6 +7021,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	 * If kernelcore=nn% or movablecore=nn% was specified, calculate the
 	 * amount of necessary memory.
 	 */
+	// 퍼센트가 정수인데, 분자에 100을 곱했다가 분모에서 10000을 나누는 이유를 알 수 없다
 	if (required_kernelcore_percent)
 		required_kernelcore = (totalpages * 100 * required_kernelcore_percent) /
 				       10000UL;
@@ -7049,6 +7060,8 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 		goto out;
 
 	/* usable_startpfn is the lowest possible pfn ZONE_MOVABLE can be at */
+	// find_usable_zone_for_movable() 에서 찾은 movable_zone의 PFN 
+	// ARM64 defconfing에서는 ZONE_NORMAL의 시작 PFN
 	usable_startpfn = arch_zone_lowest_possible_pfn[movable_zone];
 
 restart:
@@ -7062,6 +7075,7 @@ restart:
 		 * now exceeds what is necessary to satisfy the requested
 		 * amount of memory for the kernel
 		 */
+		// 다른 노드에 남은 required_kernelcore을 분배
 		if (required_kernelcore < kernelcore_node)
 			kernelcore_node = required_kernelcore / usable_nodes;
 
@@ -7077,10 +7091,12 @@ restart:
 			unsigned long size_pages;
 
 			start_pfn = max(start_pfn, zone_movable_pfn[nid]);
+			// memory block의 start_pfn~end_pfn 범위에 zone_movable_pfn이 없는 경우
 			if (start_pfn >= end_pfn)
 				continue;
 
 			/* Account for what is only usable for kernelcore */
+			// 커널 코어 영역으로 사용할 페이지 양을 결정
 			if (start_pfn < usable_startpfn) {
 				unsigned long kernel_pages;
 				kernel_pages = min(end_pfn, usable_startpfn)
@@ -7111,6 +7127,8 @@ restart:
 			 * start_pfn->end_pfn. Calculate size_pages as the
 			 * number of pages used as kernelcore
 			 */
+			// 현재 진행되고 있는 노드의 movable 존을 산출하기 위해 
+			// 현재까지 처리한 커널 코어 양의 끝 위치를 zone_movable_pfn[nid]에 저장해둔다.
 			size_pages = end_pfn - start_pfn;
 			if (size_pages > kernelcore_remaining)
 				size_pages = kernelcore_remaining;
@@ -7121,6 +7139,7 @@ restart:
 			 * break if the kernelcore for this node has been
 			 * satisfied
 			 */
+			// 커널 코어 잔량 처리
 			required_kernelcore -= min(required_kernelcore,
 								size_pages);
 			kernelcore_remaining -= size_pages;
@@ -7135,17 +7154,19 @@ restart:
 	 * along on the nodes that still have memory until kernelcore is
 	 * satisfied
 	 */
+	// usable_nodes가 0이 아니고, required_kernelcore 가 usable_nodes보다 큰 경우
+	// 연산자 우선순위 : > 먼저, && 다음 
 	usable_nodes--;
 	if (usable_nodes && required_kernelcore > usable_nodes)
 		goto restart;
 
-out2:
+out2:	// zone_movable이 있는 경우
 	/* Align start of ZONE_MOVABLE on all nids to MAX_ORDER_NR_PAGES */
 	for (nid = 0; nid < MAX_NUMNODES; nid++)
 		zone_movable_pfn[nid] =
 			roundup(zone_movable_pfn[nid], MAX_ORDER_NR_PAGES);
 
-out:
+out: 	// zone_movable이 없는 경우
 	/* restore the node_state */
 	node_states[N_MEMORY] = saved_node_state;
 }
@@ -7191,8 +7212,11 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	memset(arch_zone_highest_possible_pfn, 0,
 				sizeof(arch_zone_highest_possible_pfn));
 
+	// 모든 NUMA NID중 가장 작은 PFN을 찾음
 	start_pfn = find_min_pfn_with_active_regions();
 
+	// MOVABLE존을 제외한 모든 존에 대해서 
+	// 시작, 끝 PFN을 찾아 arch_zone_lowest_possible_pfn, arch_zone_highest_possible_pfn에 저장
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		if (i == ZONE_MOVABLE)
 			continue;
