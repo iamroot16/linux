@@ -5707,14 +5707,18 @@ overlap_memmap_init(unsigned long zone, unsigned long *pfn)
 	static struct memblock_region *r;
 
 	if (mirrored_kernelcore && zone == ZONE_MOVABLE) {
+		// !r : static 변수이므로 0으로 초기화 되고, 처음은 항상 아래 조건을 만족하게 된다
+		// 또는 PFN이 memblock region의 끝보다 큰 경우, 작을 때까지 region r을 증가시킨다
 		if (!r || *pfn >= memblock_region_memory_end_pfn(r)) {
 			for_each_memblock(memory, r) {
 				if (*pfn < memblock_region_memory_end_pfn(r))
 					break;
 			}
 		}
+		// pfn 이 해당 region의 base 보다 큼 & mirrored memblock -> overlapped true
 		if (*pfn >= memblock_region_memory_base_pfn(r) &&
 		    memblock_is_mirror(r)) {
+			// increase pfn to end pfn (= overlapped size in this memblock)
 			*pfn = memblock_region_memory_end_pfn(r);
 			return true;
 		}
@@ -6224,12 +6228,15 @@ static void __init adjust_zone_range_for_zone_movable(int nid,
 				arch_zone_highest_possible_pfn[movable_zone]);
 
 		/* Adjust for ZONE_MOVABLE starting within this range */
+		// 해당 node를 movable이 다른 zone과 나눠 쓰는 경우,
+		// movable 직전까지로 해당 zone의 end를 제한
 		} else if (!mirrored_kernelcore &&
 			*zone_start_pfn < zone_movable_pfn[nid] &&
 			*zone_end_pfn > zone_movable_pfn[nid]) {
 			*zone_end_pfn = zone_movable_pfn[nid];
 
 		/* Check if this whole range is within ZONE_MOVABLE */
+		// movable이 해당 node 전체를 차지해서 nomal이 없어지는 경우
 		} else if (*zone_start_pfn >= zone_movable_pfn[nid])
 			*zone_start_pfn = *zone_end_pfn;
 	}
@@ -6278,13 +6285,17 @@ unsigned long __init __absent_pages_in_range(int nid,
 				unsigned long range_start_pfn,
 				unsigned long range_end_pfn)
 {
+	// the number of PFNs for the zone @ nid
 	unsigned long nr_absent = range_end_pfn - range_start_pfn;
 	unsigned long start_pfn, end_pfn;
 	int i;
 
+	// decrease the number of usable pages for each memory region
 	for_each_mem_pfn_range(i, nid, &start_pfn, &end_pfn, NULL) {
+		// get intersection btw range & start/end -> start_pfn/end_pfn
 		start_pfn = clamp(start_pfn, range_start_pfn, range_end_pfn);
 		end_pfn = clamp(end_pfn, range_start_pfn, range_end_pfn);
+		// remove the number of (not absent) PFNs within the memory region i
 		nr_absent -= end_pfn - start_pfn;
 	}
 	return nr_absent;
@@ -6319,6 +6330,7 @@ static unsigned long __init zone_absent_pages_in_node(int nid,
 	if (!node_start_pfn && !node_end_pfn)
 		return 0;
 
+	// get intersection btw node & zone -> zone_start/end
 	zone_start_pfn = clamp(node_start_pfn, zone_low, zone_high);
 	zone_end_pfn = clamp(node_end_pfn, zone_low, zone_high);
 
@@ -6332,6 +6344,9 @@ static unsigned long __init zone_absent_pages_in_node(int nid,
 	 * Treat pages to be ZONE_MOVABLE in ZONE_NORMAL as absent pages
 	 * and vice versa.
 	 */
+	// No zone_movable within mirrored memblock
+	// No zone_normal within not mirroed memblock
+	// refer to previous function - find_zone_movable_pfns_for_nodes()
 	if (mirrored_kernelcore && zone_movable_pfn[nid]) {
 		unsigned long start_pfn, end_pfn;
 		struct memblock_region *r;
@@ -6342,10 +6357,12 @@ static unsigned long __init zone_absent_pages_in_node(int nid,
 			end_pfn = clamp(memblock_region_memory_end_pfn(r),
 					zone_start_pfn, zone_end_pfn);
 
+			// zone_movable & mirrored memblock
 			if (zone_type == ZONE_MOVABLE &&
 			    memblock_is_mirror(r))
 				nr_absent += end_pfn - start_pfn;
 
+			// zone_normal & NOT mirrored memblock
 			if (zone_type == ZONE_NORMAL &&
 			    !memblock_is_mirror(r))
 				nr_absent += end_pfn - start_pfn;
@@ -6403,12 +6420,14 @@ static void __init calculate_node_totalpages(struct pglist_data *pgdat,
 		unsigned long zone_start_pfn, zone_end_pfn;
 		unsigned long size, real_size;
 
+		// 전체 페이지수(hole 포함)
 		size = zone_spanned_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn,
 						  node_end_pfn,
 						  &zone_start_pfn,
 						  &zone_end_pfn,
 						  zones_size);
+		// hole을 제외한 페이지수
 		real_size = size - zone_absent_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn, node_end_pfn,
 						  zholes_size);
@@ -6416,13 +6435,14 @@ static void __init calculate_node_totalpages(struct pglist_data *pgdat,
 			zone->zone_start_pfn = zone_start_pfn;
 		else
 			zone->zone_start_pfn = 0;
+
 		zone->spanned_pages = size;
 		zone->present_pages = real_size;
 
 		totalpages += size;
 		realtotalpages += real_size;
 	}
-
+	// node id의 모든 zone에 대한 total pages, real toal pages 총합
 	pgdat->node_spanned_pages = totalpages;
 	pgdat->node_present_pages = realtotalpages;
 	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id,
@@ -6608,6 +6628,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 	enum zone_type j;
 	int nid = pgdat->node_id;
 
+	// splitqueue, waitqueue, pageext 초기화
 	pgdat_init_internals(pgdat);
 	pgdat->per_cpu_nodestats = &boot_nodestats;
 
@@ -6616,7 +6637,9 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		unsigned long size, freesize, memmap_pages;
 		unsigned long zone_start_pfn = zone->zone_start_pfn;
 
+		// 전체 페이지수(hole 포함)
 		size = zone->spanned_pages;
+		// hole을 제외한 페이지수
 		freesize = zone->present_pages;
 
 		/*
@@ -6624,9 +6647,11 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		 * is used by this zone for memmap. This affects the watermark
 		 * and per-cpu initialisations
 		 */
+		// memmap 구조체가 필요한 페이지 수
 		memmap_pages = calc_memmap_size(size, freesize);
 		if (!is_highmem_idx(j)) {
 			if (freesize >= memmap_pages) {
+				// memmap이 차지하는 'free하게 사용하지 못하는' 크기를 빼준다
 				freesize -= memmap_pages;
 				if (memmap_pages)
 					printk(KERN_DEBUG
@@ -6639,16 +6664,19 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 
 		/* Account for reserved pages */
 		if (j == 0 && freesize > dma_reserve) {
+			// dma가 예약한 'free하게 사용하지 못하는' 크기를 빼준다
 			freesize -= dma_reserve;
 			printk(KERN_DEBUG "  %s zone: %lu pages reserved\n",
 					zone_names[0], dma_reserve);
 		}
 
+		// nr_kernel_pages & nr_all_pages for watermark
 		if (!is_highmem_idx(j))
 			nr_kernel_pages += freesize;
 		/* Charge for highmem memmap if there are enough kernel pages */
 		else if (nr_kernel_pages > memmap_pages * 2)
 			nr_kernel_pages -= memmap_pages;
+
 		nr_all_pages += freesize;
 
 		/*
@@ -6733,7 +6761,8 @@ void __init free_area_init_node(int nid, unsigned long *zones_size,
 				   unsigned long node_start_pfn,
 				   unsigned long *zholes_size)
 {
-	pg_data_t *pgdat = NODE_DATA(nid);
+	// page data list from nid
+	pg_data_t *pgdat = NODE_DATA(nid); 
 	unsigned long start_pfn = 0;
 	unsigned long end_pfn = 0;
 
@@ -6754,9 +6783,14 @@ void __init free_area_init_node(int nid, unsigned long *zones_size,
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,
 				  zones_size, zholes_size);
 
+	// Spasrse 메모리 모델을 사용하는 경우,
+	// mem_map은 이미 sparse_init() 함수에서 section_mem_map[]으로 구성되었다.
 	alloc_node_mem_map(pgdat);
 	pgdat_set_deferred_range(pgdat);
 
+	// 노드의 zone 관리를 위해 zone 구조체와 관련된 정보들을 설정한다. 
+	// 그리고 usemap을 할당하고 초기화하며, 
+	// 버디 시스템에 사용하는 free_area[], lruvec, pcp 등도 초기화한다.
 	free_area_init_core(pgdat);
 }
 
@@ -6990,6 +7024,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 		bool mem_below_4gb_not_mirrored = false;
 
 		for_each_memblock(memory, r) {
+			// no zone_movable if memblock is mirrored
 			if (memblock_is_mirror(r))
 				continue;
 
@@ -7207,6 +7242,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	int i, nid;
 
 	/* Record where the zone boundaries are */
+	// 모든 zone에 대해 lowest, highest를 0으로 초기화
 	memset(arch_zone_lowest_possible_pfn, 0,
 				sizeof(arch_zone_lowest_possible_pfn));
 	memset(arch_zone_highest_possible_pfn, 0,
