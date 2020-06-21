@@ -469,10 +469,10 @@ static __always_inline int get_pfnblock_migratetype(struct page *page, unsigned 
  * @end_bitidx: The last bit of interest
  * @mask: mask of bits that the caller is interested in
  */
-void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
+void set_pfnblock_flags_mask(struct page *page, unsigned long flags/*MIGRATE_MOVABLE*/,
 					unsigned long pfn,
-					unsigned long end_bitidx,
-					unsigned long mask)
+					unsigned long end_bitidx/*2*/,
+					unsigned long mask/*0b111*/)
 {
 	unsigned long *bitmap;
 	unsigned long bitidx, word_bitidx;
@@ -486,18 +486,26 @@ void set_pfnblock_flags_mask(struct page *page, unsigned long flags,
 	word_bitidx = bitidx / BITS_PER_LONG;
 	bitidx &= (BITS_PER_LONG-1);
 
+    // e.g) bitidx == 0;
+
 	VM_BUG_ON_PAGE(!zone_spans_pfn(page_zone(page), pfn), page);
 
-	bitidx += end_bitidx;
-	mask <<= (BITS_PER_LONG - bitidx - 1);
-	flags <<= (BITS_PER_LONG - bitidx - 1);
+	bitidx += end_bitidx; ///< bitidx = 2;
+    // [{4 3 2}(migrate_bit)  {1}(skip_bit)]
+    // mask << 61   ==> 1110 .... .... ....
+    // flags << 61  ==> 0010 .... .... ....
+	mask <<= (BITS_PER_LONG - bitidx - 1); ///< mask = 0b111 << (BITS_PER_LONG - bitidx - 1)
+	flags <<= (BITS_PER_LONG - bitidx - 1); ///< flags = 1 << (BITS_PER_LONG - bitidx - 1)
 
-	word = READ_ONCE(bitmap[word_bitidx]);
+	word = READ_ONCE(bitmap[word_bitidx]); ///< e.g word = 0010 0000 .... ....
 	for (;;) {
-		old_word = cmpxchg(&bitmap[word_bitidx], word, (word & ~mask) | flags);
-		if (word == old_word)
+        //                                      기존값   001x xxxx xxxx ....
+		old_word = cmpxchg(&bitmap[word_bitidx]/*0010 0010 .... ....*/, word /*0010 0000 .... ....*/, (word & ~mask) | flags);
+        // 위에서 읽은 bitmap[word_bitidx] 의 값이 아직 변하지 않았으면 값을 적는다.
+        // cmpxchg (작동시킬 주소와, 해당 주소의 값과 비교할 값, 그리고 비교된 값이 같다면 넣을 새 값)
+		if (word/*0010 0000*/ == old_word/*0010 0010 .... ....*/)
 			break;
-		word = old_word;
+		word = old_word; ///< word == 0010 0010 .... ....
 	}
 }
 
