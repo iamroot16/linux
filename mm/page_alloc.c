@@ -1294,13 +1294,23 @@ static void free_one_page(struct zone *zone,
 	spin_unlock(&zone->lock);
 }
 
+/**
+ * pfn에 해당하는 페이지 구조체 하나를 초기화 한다
+ *
+ * @param page - pfn_to_page로 읽어온 페이지 구조체 주소
+ * @param pfn - 해당 페이지 프레임
+ * @param zone - 해당 pfn이 속하는 zone
+ * @param nid - 해당 pfn 이 속하는 node id
+ *
+ * @return - void
+ */
 static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 				unsigned long zone, int nid)
 {
-	mm_zero_struct_page(page);
+	mm_zero_struct_page(page); /* page 구조체 0으로 초기화 */
 	set_page_links(page, zone, nid, pfn);
-	init_page_count(page);
-	page_mapcount_reset(page);
+	init_page_count(page); 	/* set page->_refcount 1 */
+	page_mapcount_reset(page); /* set page->_mapcount -1 */
 	page_cpupid_reset_last(page);
 	page_kasan_tag_reset(page);
 
@@ -5801,6 +5811,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 		 * check here not to call set_pageblock_migratetype() against
 		 * pfn out of zone.
 		 */
+		/* pfn이 pageblock_nr_pages(512) 의 배수일때 true */
 		if (!(pfn & (pageblock_nr_pages - 1))) {
 			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
 			cond_resched();
