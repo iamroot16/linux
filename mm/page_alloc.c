@@ -6827,8 +6827,8 @@ static u64 zero_pfn_range(unsigned long spfn, unsigned long epfn)
 		// PFN이 invalid하면, pageblock_nr_pages는 다시 valid check하지 않고 건너뜀
 		if (!pfn_valid(ALIGN_DOWN(pfn, pageblock_nr_pages))) {
 			pfn = ALIGN_DOWN(pfn, pageblock_nr_pages)
-				+ pageblock_nr_pages - 1;
-			continue;
+				+ pageblock_nr_pages - 1; // pfn++ 으로 증가하는 것을 무마함
+			continue; // + pageblock_nr_pages (????)
 		}
 		mm_zero_struct_page(pfn_to_page(pfn));
 		pgcnt++;
@@ -7026,9 +7026,10 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 				continue;
 
 			nid = r->nid;
-
-			usable_startpfn = PFN_DOWN(r->base);
-			zone_movable_pfn[nid] = zone_movable_pfn[nid] ?
+				kernelcore_remaining -= min(kernel_pages,
+							kernelcore_remaining);
+				required_kernelcore -= min(kernel_pages,
+							required_kernelcore);
 				min(usable_startpfn, zone_movable_pfn[nid]) :
 				usable_startpfn;
 		}
@@ -7039,7 +7040,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	/*
 	 * If kernelcore=mirror is specified, ignore movablecore option
 	 */
-	if (mirrored_kernelcore) {
+	if (mirrored_kernelcore) { // ECC 패리티 기능을 증가하여 오류 수정, 오류률이 더 적게는 한번더 미러를 함
 		bool mem_below_4gb_not_mirrored = false;
 
 		for_each_memblock(memory, r) {
@@ -7075,7 +7076,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	 * If kernelcore=nn% or movablecore=nn% was specified, calculate the
 	 * amount of necessary memory.
 	 */
-	// 퍼센트가 정수인데, 분자에 100을 곱했다가 분모에서 10000을 나누는 이유를 알 수 없다
+	// 퍼센트가 정수인데, 분자에 100을 곱했다가 분모에서 10000을 나누는 이유를 알 수 없다 -> 컴파일러 정확도
 	if (required_kernelcore_percent)
 		required_kernelcore = (totalpages * 100 * required_kernelcore_percent) /
 				       10000UL;
@@ -7102,11 +7103,10 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 			roundup(required_movablecore, MAX_ORDER_NR_PAGES);
 		required_movablecore = min(totalpages, required_movablecore);
 		corepages = totalpages - required_movablecore;
-
-		required_kernelcore = max(required_kernelcore, corepages);
-	}
-
-	/*
+				kernelcore_remaining -= min(kernel_pages,
+							kernelcore_remaining);
+				required_kernelcore -= min(kernel_pages,
+							required_kernelcore);
 	 * If kernelcore was not specified or kernelcore size is larger
 	 * than totalpages, there is no ZONE_MOVABLE.
 	 */
@@ -7151,7 +7151,7 @@ restart:
 
 			/* Account for what is only usable for kernelcore */
 			// 커널 코어 영역으로 사용할 페이지 양을 결정
-			if (start_pfn < usable_startpfn) {
+			if (start_pfn < usable_startpfn) { // 시작이 DMA32 보다 작아 보정하는 부분임
 				unsigned long kernel_pages;
 				kernel_pages = min(end_pfn, usable_startpfn)
 								- start_pfn;
@@ -7162,7 +7162,7 @@ restart:
 							required_kernelcore);
 
 				/* Continue if range is now fully accounted */
-				if (end_pfn <= usable_startpfn) {
+				if (end_pfn <= usable_startpfn) { // 전체가 DMA32 보다 작아 보정하는 부분임
 
 					/*
 					 * Push zone_movable_pfn to the end so
@@ -7171,9 +7171,9 @@ restart:
 					 * not double account here
 					 */
 					zone_movable_pfn[nid] = end_pfn;
-					continue;
+					continue; // 전체가 아래 있으면 건너뛰기
 				}
-				start_pfn = usable_startpfn;
+				start_pfn = usable_startpfn; // 걸쳐 있으면 옮겨줌
 			}
 
 			/*

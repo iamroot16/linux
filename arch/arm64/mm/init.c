@@ -184,9 +184,9 @@ static void __init reserve_elfcorehdr(void)
  *	offset = 0
  *	min(0+4GB , 2GB)
  *	ret = 2GB
- *
+ *	GENMASK_ULL(63, 32) : 63 ~ 32 를 1로 만듬.
  *	6GB
- *	offset = 4GB
+ *	offset = 4GB , (1ULL << 32) = 4GB
  *	min(4+4GB, 6GB)
  */
 
@@ -205,7 +205,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
 	// 
 	unsigned long max_zone_pfns[MAX_NR_ZONES]  = {0};
 
-	// 32비트 주소만 접근 기능한 DMA(Direct Memory Access) 디바이스를 운용하는 경우 이 영역을 이용할 수 있다. 대부분의 ARM64 시스템은 ZONE_DMA32 영역을 이용하지 않는다. 그러나 default는 되어있다.
+	// 32비트 주소만 접근 가능한 DMA(Direct Memory Access) 디바이스를 운용하는 경우 이 영역을 이용할 수 있다. 
+	// 대부분의 ARM64 시스템은 ZONE_DMA32 영역을 이용하지 않는다. 그러나 default는 되어있다.
+
+	/* 실전에서 32 DMA 를 사용하는 경우? PCI 장치 중에 64 비트 주소를 사용하지 않는 경우가 있음!! */
 	if (IS_ENABLED(CONFIG_ZONE_DMA32))
 		// http://jake.dothome.co.kr/bootmem_init-64/ 그림 참조!! 
 		max_zone_pfns[ZONE_DMA32] = PFN_DOWN(max_zone_dma_phys());
