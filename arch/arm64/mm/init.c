@@ -471,7 +471,7 @@ void __init bootmem_init(void)
 
 	early_memtest(min << PAGE_SHIFT, max << PAGE_SHIFT);
 
-    // arm64에는 highmem이 없다. 따라서 highmem 경계를 나타내는 max_low_pfn은 max 값과 동일하다. (문C 펌)
+	// arm64에는 highmem이 없다. 따라서 highmem 경계를 나타내는 max_low_pfn은 max 값과 동일하다. (문C 펌)
 	max_pfn = max_low_pfn = max;
 
 	arm64_numa_init();

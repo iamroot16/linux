@@ -1105,11 +1105,12 @@ static inline unsigned long early_pfn_to_nid(unsigned long pfn)
 
 static inline unsigned long pfn_to_section_nr(unsigned long pfn)
 {
-    // pfn을 section number로 바꾸어 반환
+	// pfn을 section number로 바꾸어 반환
 	return pfn >> PFN_SECTION_SHIFT;
 }
 static inline unsigned long section_nr_to_pfn(unsigned long sec)
 {
+	// sectin을 pfn으로 바꾸어 반환
 	return sec << PFN_SECTION_SHIFT;
 }
 

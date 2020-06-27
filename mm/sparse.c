@@ -90,7 +90,7 @@ static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 	if (mem_section[root])
 		return -EEXIST;
 
-	// 해당 노드에서 2 단계용 섹션 테이블을 할당받아 구성한다. 핫플러그 메모리를 위해 각 mem_section[] 테이블은 해당 노드에 위치해야 한다.
+	// 해당 노드에서 2 단계용 섹션 테이블(section)을 할당받아 구성한다. 핫플러그 메모리를 위해 각 mem_section[] 테이블은 해당 노드에 위치해야 한다.
 	section = sparse_index_alloc(nid);
 	if (!section)
 		return -ENOMEM;
@@ -235,13 +235,13 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 // NR_SECTION_ROOTS = 1024
 // SECTION_PER_ROOT = 256 (See mmzone.h)
 #ifdef CONFIG_SPARSEMEM_EXTREME
-	if (unlikely(!mem_section)) {
+	if (unlikely(!mem_section)) { // 1단계 배열 할당 확인
 		unsigned long size, align;
 
 		size = sizeof(struct mem_section*) * NR_SECTION_ROOTS;
-        // INTERNODE_CACHE_SHIFT = 6 
+		// INTERNODE_CACHE_SHIFT = 6 (@ L1 cache line)
 		align = 1 << (INTERNODE_CACHE_SHIFT);
-        // size = 8K, align = 64
+		// size = 8K, align = 64
 		mem_section = memblock_alloc(size, align);
 		if (!mem_section)
 			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
@@ -251,12 +251,11 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 	// 요청한 범위의 시작 pfn을 섹션 단위로 내림 정렬한 주소로 변환한 후 
 	// 해당 범위의 pfn이 실제로 지정할 수 있는 물리 메모리 범위에 포함되는지 검증하고 초과 시 그 주소를 강제로 제한한다.
-    
-    // start를 section 단위(PAGE_PER_SECTION)에 맞춰 내림 (PAGE_SECTION_MASK = (~(256K-1)))
+	// start를 section 단위(PAGE_PER_SECTION)에 맞춰 내림 (PAGE_SECTION_MASK = (~(256K-1)))
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
 	// 시작 pfn부터 섹션 단위로 증가시키며 이 값으로 section 번호를 구한다.
-	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
+	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) { // 섹션 단위로 증가
 		unsigned long section = pfn_to_section_nr(pfn);
 		struct mem_section *ms;
 
@@ -273,11 +272,11 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 		// 해당 섹션의 mem_section 구조체내의 section_mem_map에 노드 id와 online 및 present 플래그를 설정한다.
  
-        //  SECTION_IS_ONLINE   (1UL<<2)
-
+		// SECTION_IS_ONLINE   (1UL<<2)
+		// 섹션넘버에 해당하는 memory section 구조체의 주소를 리턴
 		ms = __nr_to_section(section);
-		if (!ms->section_mem_map) {
-            // ms->section_mem_map = nid <<3 | 1UL << 2
+		if (!ms->section_mem_map) { // memory section 구조체를 설정
+			// ms->section_mem_map = nid <<3 | 1UL << 2
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
 							SECTION_IS_ONLINE;
 			section_mark_present(ms);
@@ -553,9 +552,11 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		}
 		check_usemap_section_nr(nid, usemap); // default로 비어있는 함수로 실행되기에 아무것도 수행되지 않는다.
 		// for_each를 돌때마다 *usemap 과 pnum이 각각 가산되서 init을 한다.
+		// mem_map 영역을 엔코딩하여 가상주소를 mem_section에 연결하고 usemap 영역도 연결한다.
 		sparse_init_one_section(__nr_to_section(pnum), pnum, map, usemap);
 		usemap += usemap_longs;
 	}
+	// free sparsemap_buf which was allocated @ sparse_buffer_init()
 	sparse_buffer_fini();
 	return;
 failed:
@@ -583,11 +584,13 @@ failed:
  */
 void __init sparse_init(void)
 {
+	// 첫번째 섹션의 NID를 mem_section으로 부터 구해서 nid_begin에 저장
 	unsigned long pnum_begin = first_present_section_nr();
 	int nid_begin = sparse_early_nid(__nr_to_section(pnum_begin));
 	unsigned long pnum_end, map_count = 1;
 
 	/* Setup pageblock_order for HUGETLB_PAGE_SIZE_VARIABLE */
+	// ARM64 시스템의 디폴트 설정은 pageblock_order 값에 9을 사용한다.
 	set_pageblock_order();
 
 	for_each_present_section_nr(pnum_begin + 1, pnum_end) {
@@ -599,7 +602,8 @@ void __init sparse_init(void)
 		}
 		/* Init node with sections in range [pnum_begin, pnum_end) */
 		// for_each_present_section_nr(pnum_begin, pnum) 
-		// for_each로 sparse할때에 겉에서는 전체를 보고 요기 아래서는 같은 nid끼리 처리를 한다.
+		// for_each로 sparse할때에 겉에서는 전체 section에 대해 반복하면서
+		// nid가 이전과 동일하면 continue하지만, 달라지면 같은 nid끼리 처리를 한다.
 		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
 		nid_begin = nid;
 		pnum_begin = pnum_end;
