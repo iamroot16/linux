@@ -6560,11 +6560,11 @@ static unsigned long __init calc_memmap_size(unsigned long spanned_pages,
 	 * populated regions may not be naturally aligned on page boundary.
 	 * So the (present_pages >> 4) heuristic is a tradeoff for that.
 	 */
-	if (spanned_pages > present_pages + (present_pages >> 4) &&
+	if (spanned_pages > present_pages + (present_pages >> 4) && 
 	    IS_ENABLED(CONFIG_SPARSEMEM))
-		pages = present_pages;
-
-	return PAGE_ALIGN(pages * sizeof(struct page)) >> PAGE_SHIFT;
+		pages = present_pages; // hole 이 너무 크다 기준 == present_pages + (present_pages >> 4)
+	// 페이지 갯수 만큼 64byte 페이지 디스크립터를 만들기 위해 사이즈 계산함 
+	return PAGE_ALIGN(pages * sizeof(struct page)) >> PAGE_SHIFT; // => mem_map 에 사용할 페이지 갯수를 대략적으로 계산함
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -6805,7 +6805,7 @@ void __init free_area_init_node(int nid, unsigned long *zones_size,
 	// Spasrse 메모리 모델을 사용하는 경우,
 	// mem_map은 이미 sparse_init() 함수에서 section_mem_map[]으로 구성되었다.
 	alloc_node_mem_map(pgdat);
-	pgdat_set_deferred_range(pgdat);
+	pgdat_set_deferred_range(pgdat); // mem map 초기화에 오래걸려서 나중에 함 (x86 에서는 되어있는데, 현재 안되어있음)
 
 	// 노드의 zone 관리를 위해 zone 구조체와 관련된 정보들을 설정한다. 
 	// 그리고 usemap을 할당하고 초기화하며, 
@@ -6824,8 +6824,9 @@ static u64 zero_pfn_range(unsigned long spfn, unsigned long epfn)
 	u64 pgcnt = 0;
 
 	for (pfn = spfn; pfn < epfn; pfn++) {
-		// PFN이 invalid하면, pageblock_nr_pages는 다시 valid check하지 않고 건너뜀
-		if (!pfn_valid(ALIGN_DOWN(pfn, pageblock_nr_pages))) {
+		// PFN이 invalid하면 (전체를 검사 X), 청크 당 한번만 수행함
+		// 즉, pageblock_nr_pages는 다시 valid check하지 않고 빠르게 스킵함
+		if (!pfn_valid(ALIGN_DOWN(pfn, pageblock_nr_pages))) { // 첫번째만 접근해서 캐쉬 되어 있어 빠름
 			pfn = ALIGN_DOWN(pfn, pageblock_nr_pages)
 				+ pageblock_nr_pages - 1; // pfn++ 으로 증가하는 것을 무마함
 			continue; // + pageblock_nr_pages (????)
@@ -7323,8 +7324,8 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	mminit_verify_pageflags_layout();
 	setup_nr_node_ids();
 	zero_resv_unavail();
-	for_each_online_node(nid) {
-		pg_data_t *pgdat = NODE_DATA(nid);
+	for_each_online_node(nid) { // NODE -> ZONE (회수 관련 코드가 ZONE 에서 NODE 로 이식됨)
+		pg_data_t *pgdat = NODE_DATA(nid); // pg_data_t -> ZONE 별에서 최근 NODE 별로 코드가 이식됨
 		free_area_init_node(nid, NULL,
 				find_min_pfn_for_node(nid), NULL);
 
