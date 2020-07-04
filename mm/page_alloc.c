@@ -6824,7 +6824,7 @@ static u64 zero_pfn_range(unsigned long spfn, unsigned long epfn)
 	u64 pgcnt = 0;
 
 	for (pfn = spfn; pfn < epfn; pfn++) {
-		// PFN이 invalid하면, pageblock_nr_pages는 다시 valid check하지 않고 건너뜀
+		// PFN이 invalid하면, pageblock_nr_pages 단위로 다시 valid check하지 않고 건너뜀
 		if (!pfn_valid(ALIGN_DOWN(pfn, pageblock_nr_pages))) {
 			pfn = ALIGN_DOWN(pfn, pageblock_nr_pages)
 				+ pageblock_nr_pages - 1;
@@ -7007,7 +7007,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	unsigned long kernelcore_node, kernelcore_remaining;
 	/* save the state before borrow the nodemask */
 	nodemask_t saved_node_state = node_states[N_MEMORY];
-	unsigned long totalpages = early_calculate_totalpages();
+	unsigned long totalpages = early_calculate_totalpages(); // zone 상관없이 모든 페이지수
 	int usable_nodes = nodes_weight(node_states[N_MEMORY]);
 	struct memblock_region *r;
 
@@ -7039,7 +7039,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	/*
 	 * If kernelcore=mirror is specified, ignore movablecore option
 	 */
-	if (mirrored_kernelcore) {
+	if (mirrored_kernelcore) { // 커널메모리만 미러를 할 경우
 		bool mem_below_4gb_not_mirrored = false;
 
 		for_each_memblock(memory, r) {
@@ -7052,7 +7052,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 			// region에서 가장 낮은 사용 가능한 PFN을 리턴 
 			usable_startpfn = memblock_region_memory_base_pfn(r);
 
-			// mirrored_kernelcore 이면서 PFN이 4GB 미만 위치 인지 검사
+			// mirrored_kernelcore 이면서 PFN이 4GB 미만 위치 인지 검사 -> 설정에 문제가 있는 경우
 			if (usable_startpfn < 0x100000) { 
 				mem_below_4gb_not_mirrored = true;
 				continue;
@@ -7075,6 +7075,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 	 * If kernelcore=nn% or movablecore=nn% was specified, calculate the
 	 * amount of necessary memory.
 	 */
+	// zone 상관없이 total page수에서 비율을 계산
 	// 퍼센트가 정수인데, 분자에 100을 곱했다가 분모에서 10000을 나누는 이유를 알 수 없다
 	if (required_kernelcore_percent)
 		required_kernelcore = (totalpages * 100 * required_kernelcore_percent) /
@@ -7150,7 +7151,7 @@ restart:
 				continue;
 
 			/* Account for what is only usable for kernelcore */
-			// 커널 코어 영역으로 사용할 페이지 양을 결정
+			// 커널 코어 영역으로 사용할 페이지 양을 결정 (ZONE_NORMAL(위에서 ZONE_MOVALBLE 찾는 시작 주소) 아래)
 			if (start_pfn < usable_startpfn) {
 				unsigned long kernel_pages;
 				kernel_pages = min(end_pfn, usable_startpfn)
@@ -7162,6 +7163,7 @@ restart:
 							required_kernelcore);
 
 				/* Continue if range is now fully accounted */
+				// movable pfn을 커널 코어로 할당된 영역 위의 주소로 바꾼다
 				if (end_pfn <= usable_startpfn) {
 
 					/*
@@ -7210,7 +7212,7 @@ restart:
 	 */
 	// usable_nodes가 0이 아니고, required_kernelcore 가 usable_nodes보다 큰 경우
 	// 연산자 우선순위 : > 먼저, && 다음 
-	usable_nodes--;
+	usable_nodes--; // 
 	if (usable_nodes && required_kernelcore > usable_nodes)
 		goto restart;
 

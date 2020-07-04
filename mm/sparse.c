@@ -557,9 +557,10 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		usemap += usemap_longs;
 	}
 	// free sparsemap_buf which was allocated @ sparse_buffer_init()
+	// 일반적인 경우, 지워야할 메모리는 없다
 	sparse_buffer_fini();
 	return;
-failed:
+failed: 
 	/* We failed to allocate, mark all the following pnums as not present */
 	/*
 	 * 1. usemap이 없는겨우
