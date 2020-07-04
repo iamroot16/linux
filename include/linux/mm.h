@@ -827,7 +827,11 @@ vm_fault_t finish_mkwrite_fault(struct vm_fault *vmf);
  * sets it, so none of the operations on it need to be atomic.
  */
 
-/* Page flags: | [SECTION] | [NODE] | ZONE | [LAST_CPUPID] | ... | FLAGS | */
+/*
+ * Page flags: | [SECTION] | [NODE] | ZONE | [LAST_CPUPID] | ... | FLAGS |
+ * Page width: | [0]       | [2]    | 2    | [16]          | ... | FLAGS |
+ * Page offset:64          64       62     60              34... | FLAGS |
+ */
 #define SECTIONS_PGOFF		((sizeof(unsigned long)*8) - SECTIONS_WIDTH)
 #define NODES_PGOFF		(SECTIONS_PGOFF - NODES_WIDTH)
 #define ZONES_PGOFF		(NODES_PGOFF - ZONES_WIDTH)
@@ -1094,8 +1098,10 @@ static inline int page_cpupid_last(struct page *page)
 
 extern int page_cpupid_xchg_last(struct page *page, int cpupid);
 
+/* cpuid  bit를 전부1로 초기화 한다 */
 static inline void page_cpupid_reset_last(struct page *page)
 {
+	/* ex. LAST_CPUPID_MASK(0b11111111_11111111), LAST_CPUPID_PGSHIFT(34) */
 	page->flags |= LAST_CPUPID_MASK << LAST_CPUPID_PGSHIFT;
 }
 #endif /* LAST_CPUPID_NOT_IN_PAGE_FLAGS */
@@ -1196,16 +1202,21 @@ static inline unsigned long page_to_section(const struct page *page)
 
 static inline void set_page_zone(struct page *page, enum zone_type zone)
 {
+	/* ZONES_MASK(0b11), ZONES_PGSHIFT(62) */
 	page->flags &= ~(ZONES_MASK << ZONES_PGSHIFT);
 	page->flags |= (zone & ZONES_MASK) << ZONES_PGSHIFT;
 }
 
 static inline void set_page_node(struct page *page, unsigned long node)
 {
+	/* NODES_MASK(0b11), NODES_PGSHIFT(60) */
 	page->flags &= ~(NODES_MASK << NODES_PGSHIFT);
 	page->flags |= (node & NODES_MASK) << NODES_PGSHIFT;
 }
 
+/*
+ * page 구조체 flags 멤버변수에 pfn이 속하는 zone 과 nodeid 설정
+ */
 static inline void set_page_links(struct page *page, enum zone_type zone,
 	unsigned long node, unsigned long pfn)
 {

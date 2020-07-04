@@ -59,7 +59,7 @@ void __init mminit_verify_zonelist(void)
 		}
 	}
 }
-
+// page->flags에 들어갈 섹션 비트 수, 노드 비트 수, 존 비트 수 등을 점검
 void __init mminit_verify_pageflags_layout(void)
 {
 	int shift, width;

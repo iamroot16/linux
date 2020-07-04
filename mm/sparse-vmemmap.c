@@ -245,6 +245,7 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 	return 0;
 }
 
+// pnum <- section number
 struct page * __meminit sparse_mem_map_populate(unsigned long pnum, int nid,
 		struct vmem_altmap *altmap)
 {
@@ -252,10 +253,12 @@ struct page * __meminit sparse_mem_map_populate(unsigned long pnum, int nid,
 	unsigned long end;
 	struct page *map;
 
+	// PAGES_PER_SECTION := 4K 일때 1UL<<18; a.k.a 256*1024
 	map = pfn_to_page(pnum * PAGES_PER_SECTION);
 	start = (unsigned long)map;
 	end = (unsigned long)(map + PAGES_PER_SECTION);
 
+	// numa 여부에 따라서 좀 다름
 	if (vmemmap_populate(start, end, nid, altmap))
 		return NULL;
 

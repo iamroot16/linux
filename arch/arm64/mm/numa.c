@@ -251,6 +251,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 	/* report and initialize */
 	pr_info("NODE_DATA [mem %#010Lx-%#010Lx]\n",
 		nd_pa, nd_pa + nd_size - 1);
+    // tnid가 의미하는 것은 정확히 파악되지 않음
 	tnid = early_pfn_to_nid(nd_pa >> PAGE_SHIFT);
 	if (tnid != nid)
 		pr_info("NODE_DATA(%d) on node %d\n", nid, tnid);
@@ -415,13 +416,13 @@ static int __init numa_init(int (*init_func)(void))
 	int ret;
 
 	// NUMA 상태를 관리하는 비트맵들을 모두 초기화한다.
-    // 세개의 배열을 0으로 초기화 한다.
+	// 세개의 배열을 0으로 초기화 한다.
 	nodes_clear(numa_nodes_parsed);
 	nodes_clear(node_possible_map);
 	nodes_clear(node_online_map);
 
 	// numa_disatance[] 배열을 필요한 만큼 할당하고 초기 값들을 지정한다.
-    // distance map을 초기화한다.
+	// distance map을 초기화한다.
 	ret = numa_alloc_distance();
 	if (ret < 0)
 		return ret;

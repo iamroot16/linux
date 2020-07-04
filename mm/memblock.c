@@ -1224,6 +1224,7 @@ void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 	while (++*idx < type->cnt) {
 		r = &type->regions[*idx];
 
+		// 온전히 하나 이상의 페이지 프레임을 구할 수 없는 경우 아래 조건이 참
 		if (PFN_UP(r->base) >= PFN_DOWN(r->base + r->size))
 			continue;
 		if (nid == MAX_NUMNODES || nid == r->nid)
@@ -1470,7 +1471,9 @@ void * __init memblock_alloc_try_nid_raw(
 
 	ptr = memblock_alloc_internal(size, align,
 					   min_addr, max_addr, nid);
+	// 정상적으로 할당 되었는지 확인한다.
 	if (ptr && size > 0)
+		// 일반적인 휘발된 메모리는 0으로 clear되어있으니 전부다 1 로 Set해준다.
 		page_init_poison(ptr, size);
 
 	return ptr;
@@ -1815,6 +1818,7 @@ static void __init_memblock memblock_dump(struct memblock_type *type)
 			snprintf(nid_buf, sizeof(nid_buf), " on node %d",
 				 memblock_get_region_node(rgn));
 #endif
+        // " memory[0]    [base-end], size, bytes on node 0 flags: memblock_flags
 		pr_info(" %s[%#x]\t[%pa-%pa], %pa bytes%s flags: %#x\n",
 			type->name, idx, &base, &end, &size, nid_buf, flags);
 	}

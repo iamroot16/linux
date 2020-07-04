@@ -48,13 +48,13 @@
 	 __pgdat->node_start_pfn;					\
 })
 
-#elif defined(CONFIG_SPARSEMEM_VMEMMAP)
-
+#elif defined(CONFIG_SPARSEMEM_VMEMMAP) // 단순 계산으로 접근하도록 struct page 를 리니어하게 접근함 (속도 향상)
+// struct -> 64 byte , 4K 마다 64 바이트가 들어가면 2^12 / 2^6 = 2^6 = 64 , 약 1.5% 메모리가 낭비됨.
 /* memmap is virtually contiguous.  */
-#define __pfn_to_page(pfn)	(vmemmap + (pfn))
+#define __pfn_to_page(pfn)	(vmemmap + (pfn)) // 인코딩의 목적은 덧셈 뺄셈 한번을 줄이려고 (구조체를 따라가는 횟수를 줄임)
 #define __page_to_pfn(page)	(unsigned long)((page) - vmemmap)
 
-#elif defined(CONFIG_SPARSEMEM)
+#elif defined(CONFIG_SPARSEMEM) // 누마 노드 사이의 홀로 인한 메모리 낭비를 줄임
 /*
  * Note: section's mem_map is encoded to reflect its start_pfn.
  * section[i].section_mem_map == mem_map's address - start_pfn;
