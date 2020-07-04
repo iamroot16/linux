@@ -465,6 +465,7 @@ void __init bootmem_init(void)
 	 */
 	// 각 메모리 모델의 관리를 위해 필요한 데이터를 초기화한다.
 	// sparse memory 모델의 경우 memblock에 등록된 모든 메모리 블록에 대해 섹션별로 메모리가 존재하는 곳의 mem_section을 초기화한다.
+	// 실제적인 section_memmap아직 할당되지 않음. 단지 존재한다는 플래그만 설정되었다.
 	memblocks_present();
 	// Sparse memory 모델을 사용하는 시스템을 위해 관리 영역을 할당받고 매핑 초기화한다
 	sparse_init();
