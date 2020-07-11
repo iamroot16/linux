@@ -25,6 +25,9 @@
 
 static inline void INIT_LIST_HEAD(struct list_head *list)
 {
+	// next를 먼저 하고 prev를 나중에 하도록, write_once를 사용하여 next의 write가 끝나고 prev를 쓰는 순서가 보장되며 
+	// 또한 atomic하게 수행되도록 함 (컴파일러 수준에서)
+	// https://lwn.net/Articles/793253/#Code%20Reordering
 	WRITE_ONCE(list->next, list);
 	list->prev = list;
 }

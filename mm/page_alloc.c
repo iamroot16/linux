@@ -1309,7 +1309,7 @@ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 {
 	mm_zero_struct_page(page); /* page 구조체 0으로 초기화 */
 	set_page_links(page, zone, nid, pfn);
-	init_page_count(page); 	/* set page->_refcount 1 */
+	init_page_count(page); 	/* set page->_refcount 1 (will be free and set to zero */ 
 	page_mapcount_reset(page); /* set page->_mapcount -1 */
 	page_cpupid_reset_last(page);
 	page_kasan_tag_reset(page);
@@ -5813,7 +5813,7 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 		 */
 		/* pfn이 pageblock_nr_pages(512) 의 배수일때 true */
 		if (!(pfn & (pageblock_nr_pages - 1))) {
-			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
+			set_pageblock_migratetype(page, MIGRATE_MOVABLE); // 아직 할당한게 아니니까, movable로 설정
 			cond_resched();
 		}
 	}
