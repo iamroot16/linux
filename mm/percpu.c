@@ -2345,14 +2345,24 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	while (alloc_size % upa || (offset_in_page(alloc_size / upa)))
 		upa--;
 	max_upa = upa;
-
+	// 근접성을 통해 CPU를 그룹화한다.
 	/* group cpus according to their proximity */
+	// iteration 을 돌때마다 possible_bit에 있는 비트 index 를 cpu값으로 사용한다.
+	// 4코어면 0,1,2,3
 	for_each_possible_cpu(cpu) {
 		group = 0;
 	next_group:
 		for_each_possible_cpu(tcpu) {
 			if (cpu == tcpu)
 				break;
+			// if cpu==tcpu
+			// *
+			// * *
+			// * * * 
+			// 이런 형태로 돌게된다.
+			// cpu 1, tcpu 0
+			// group = 1
+			// nr_groups <- 2 
 			if (group_map[tcpu] == group && cpu_distance_fn &&
 			    (cpu_distance_fn(cpu, tcpu) > LOCAL_DISTANCE ||
 			     cpu_distance_fn(tcpu, cpu) > LOCAL_DISTANCE)) {
