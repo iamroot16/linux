@@ -33,7 +33,7 @@ static __always_inline void boot_init_stack_canary(void)
 	canary ^= LINUX_VERSION_CODE;
 	canary &= CANARY_MASK;
 
-	current->stack_canary = canary;
+	current->stack_canary = canary; // 리턴 주소의 변경 혹은 스택 오버플로를 검출하기 위한 임의의 값
 	if (!IS_ENABLED(CONFIG_STACKPROTECTOR_PER_TASK))
 		__stack_chk_guard = current->stack_canary;
 }

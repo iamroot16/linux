@@ -384,7 +384,7 @@ static bool __of_find_n_match_cpu_property(struct device_node *cpun,
 
 	ac = of_n_addr_cells(cpun);
 	cell = of_get_property(cpun, prop_name, &prop_len);
-	if (!cell && !ac && arch_match_cpu_phys_id(cpu, 0))
+	if (!cell && !ac && arch_match_cpu_phys_id(cpu, 0)) // For some single core arm
 		return true;
 	if (!cell || !ac)
 		return false;
@@ -393,7 +393,7 @@ static bool __of_find_n_match_cpu_property(struct device_node *cpun,
 		hwid = of_read_number(cell, ac);
 		if (arch_match_cpu_phys_id(cpu, hwid)) {
 			if (thread)
-				*thread = tid;
+				*thread = tid; // local thread number within the core
 			return true;
 		}
 		cell += ac;

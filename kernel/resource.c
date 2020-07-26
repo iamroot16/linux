@@ -193,17 +193,17 @@ static struct resource * __request_resource(struct resource *root, struct resour
 		return root;
 	if (end > root->end)
 		return root;
-	p = &root->child;
+	p = &root->child; // child 중에서 가장 작은 주소를 가진 자식
 	for (;;) {
 		tmp = *p;
-		if (!tmp || tmp->start > end) {
+		if (!tmp || tmp->start > end) { // 자식이 없거나 자식보다 더 작은 주소인 경우
 			new->sibling = tmp;
 			*p = new;
 			new->parent = root;
 			return NULL;
 		}
 		p = &tmp->sibling;
-		if (tmp->end < start)
+		if (tmp->end < start) // 시작 주소가 더 크므로, 다음 sibiling으로
 			continue;
 		return tmp;
 	}

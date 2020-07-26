@@ -1901,20 +1901,22 @@ struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 	void *ptr;
 	int unit;
 
+	// ai 구조체, group 배열(nr_groups 개)를 cpu_map[]의 자료형 unsigned int로 정렬한 크기
 	base_size = ALIGN(sizeof(*ai) + nr_groups * sizeof(ai->groups[0]),
 			  __alignof__(ai->groups[0].cpu_map[0]));
+	// base_size뒤에 cpu_map 배열(nr_units 개)가 있을 때의 크기
 	ai_size = base_size + nr_units * sizeof(ai->groups[0].cpu_map[0]);
 
 	ptr = memblock_alloc(PFN_ALIGN(ai_size), PAGE_SIZE);
 	if (!ptr)
 		return NULL;
-	ai = ptr;
+	ai = ptr; // groups (# of group) 이 생긴다
 	ptr += base_size;
 
-	ai->groups[0].cpu_map = ptr;
+	ai->groups[0].cpu_map = ptr; // cpu_map 배열의 시작 주소
 
 	for (unit = 0; unit < nr_units; unit++)
-		ai->groups[0].cpu_map[unit] = NR_CPUS;
+		ai->groups[0].cpu_map[unit] = NR_CPUS; // 초기화
 
 	ai->nr_groups = nr_groups;
 	ai->__ai_size = PFN_ALIGN(ai_size);
@@ -2327,6 +2329,9 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	memset(group_cnt, 0, sizeof(group_cnt));
 
 	/* calculate size_sum and ensure dyn_size is enough for early alloc */
+	// size_sum은 static 영역 + reserved 영역 + dynamic 영역을 모두 더한 크기를 페이지 단위로 정렬한 크기다. 
+	// dyn_size는 최소 PERCPU_DYNAMIC_EARLY_SIZE(12K)이고, 
+	// 32비트에서 20K 이고, 64비트 시스템에서는 28K이다.
 	size_sum = PFN_ALIGN(static_size + reserved_size +
 			    max_t(size_t, dyn_size, PERCPU_DYNAMIC_EARLY_SIZE));
 	dyn_size = size_sum - static_size - reserved_size;
@@ -2337,11 +2342,15 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	 * which can accommodate 4k aligned segments which are equal to
 	 * or larger than min_unit_size.
 	 */
+	// PCPU_MIN_UNIT_SIZE : 32K
 	min_unit_size = max_t(size_t, size_sum, PCPU_MIN_UNIT_SIZE);
 
 	/* determine the maximum # of units that can fit in an allocation */
+	// atom_size : page size (4K)
 	alloc_size = roundup(min_unit_size, atom_size);
 	upa = alloc_size / min_unit_size;
+	// alloc_size가 upa로 나머지 없이 나누어 떨어지고,
+	// 몫(=unit의 크기)이 페이지 단위로 정렬 되는 upa를 최대값부터 1씩 감소시키면서 찾는다 (power of 2)
 	while (alloc_size % upa || (offset_in_page(alloc_size / upa)))
 		upa--;
 	max_upa = upa;
@@ -2353,7 +2362,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 		group = 0;
 	next_group:
 		for_each_possible_cpu(tcpu) {
-			if (cpu == tcpu)
+			if (cpu == tcpu) // cpu >= tcpu 일때만 루프를 돌게 된다
 				break;
 			// if cpu==tcpu
 			// *
@@ -2371,6 +2380,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 				goto next_group;
 			}
 		}
+		// group_map[] : 노드수, group_cnt[] : 노드 안에 있는 cpu 수
 		group_map[cpu] = group;
 		group_cnt[group]++;
 	}
@@ -2381,16 +2391,16 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	 * Related to atom_size, which could be much larger than the unit_size.
 	 */
 	last_allocs = INT_MAX;
-	for (upa = max_upa; upa; upa--) {
+	for (upa = max_upa; upa; upa--) {  // 낭비가 가장 적게 되는 best_upa를 찾는다
 		int allocs = 0, wasted = 0;
-
+		// 위에서 max_upa를 찾는 조건과 동일
 		if (alloc_size % upa || (offset_in_page(alloc_size / upa)))
 			continue;
 
-		for (group = 0; group < nr_groups; group++) {
-			int this_allocs = DIV_ROUND_UP(group_cnt[group], upa);
-			allocs += this_allocs;
-			wasted += this_allocs * upa - group_cnt[group];
+		for (group = 0; group < nr_groups; group++) {		
+			int this_allocs = DIV_ROUND_UP(group_cnt[group], upa);// 이 group에서 한번 Allocation하는 횟수
+			allocs += this_allocs; // 전체 group에 대한 allocation 수의 합
+			wasted += this_allocs * upa - group_cnt[group]; // 이 group에서 div_round_up에 의해 낭비되는 unit 수의 합
 		}
 
 		/*
@@ -2402,25 +2412,25 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 			continue;
 
 		/* and then don't consume more memory */
-		if (allocs > last_allocs)
+		if (allocs > last_allocs) // allocs가 커지면 직전에 계산한 upa가 best
 			break;
 		last_allocs = allocs;
 		best_upa = upa;
 	}
 	upa = best_upa;
 
-	/* allocate and fill alloc_info */
+	/* allocate and fill alloc_info */ 
 	for (group = 0; group < nr_groups; group++)
-		nr_units += roundup(group_cnt[group], upa);
+		nr_units += roundup(group_cnt[group], upa); // 그룹별로 할당되는 unit 수의 합 
 
-	ai = pcpu_alloc_alloc_info(nr_groups, nr_units);
+	ai = pcpu_alloc_alloc_info(nr_groups, nr_units); // ai : allocation info
 	if (!ai)
 		return ERR_PTR(-ENOMEM);
-	cpu_map = ai->groups[0].cpu_map;
+	cpu_map = ai->groups[0].cpu_map; // cpu_map[0]의 시작주소
 
 	for (group = 0; group < nr_groups; group++) {
-		ai->groups[group].cpu_map = cpu_map;
-		cpu_map += roundup(group_cnt[group], upa);
+		ai->groups[group].cpu_map = cpu_map; // 해당 group에 매핑되는 cpu_map[]의 시작 주소
+		cpu_map += roundup(group_cnt[group], upa); // 해당 group의 cpu들에 할당되는 unit의 총합(위의 nr_units 계산 방식과 동일)
 	}
 
 	ai->static_size = static_size;
@@ -2431,19 +2441,19 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	ai->alloc_size = alloc_size;
 
 	for (group = 0, unit = 0; group < nr_groups; group++) {
-		struct pcpu_group_info *gi = &ai->groups[group];
+		struct pcpu_group_info *gi = &ai->groups[group]; // gi : group info
 
 		/*
 		 * Initialize base_offset as if all groups are located
 		 * back-to-back.  The caller should update this to
 		 * reflect actual allocation.
 		 */
-		gi->base_offset = unit * ai->unit_size;
+		gi->base_offset = unit * ai->unit_size; 
 
-		for_each_possible_cpu(cpu)
+		for_each_possible_cpu(cpu) // 이전에 pcpu_alloc_alloc_info에서 모두 NR_CPU로 초기화된 상태에서, possible cpu는 cpu 인덱스로 설정. 
 			if (group_map[cpu] == group)
 				gi->cpu_map[gi->nr_units++] = cpu;
-		gi->nr_units = roundup(gi->nr_units, upa);
+		gi->nr_units = roundup(gi->nr_units, upa); // 해당 group에서 할당되는 unit수
 		unit += gi->nr_units;
 	}
 	BUG_ON(unit != nr_units);
@@ -2518,8 +2528,8 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		struct pcpu_group_info *gi = &ai->groups[group];
 		unsigned int cpu = NR_CPUS;
 		void *ptr;
-
-		for (i = 0; i < gi->nr_units && cpu == NR_CPUS; i++)
+		// cpu가 매핑되지 않은 경우, cpu_map으로 부터 cpu를 갱신 (possible하지 않은 cpu는 pcpu_alloc_alloc_info에서 NR_CPUS로 초기화된 상태 그대로)
+		for (i = 0; i < gi->nr_units && cpu == NR_CPUS; i++) 
 			cpu = gi->cpu_map[i];
 		BUG_ON(cpu == NR_CPUS);
 
@@ -2533,14 +2543,14 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		kmemleak_free(ptr);
 		areas[group] = ptr;
 
-		base = min(ptr, base);
-		if (ptr > areas[highest_group])
+		base = min(ptr, base); // base : 가장 낮은 area[] 주소
+		if (ptr > areas[highest_group]) // highest_group : 가장 높은 area[] 주소를 가진 group
 			highest_group = group;
 	}
-	max_distance = areas[highest_group] - base;
-	max_distance += ai->unit_size * ai->groups[highest_group].nr_units;
+	max_distance = areas[highest_group] - base; // area[] 주소의 차이
+	max_distance += ai->unit_size * ai->groups[highest_group].nr_units; // unit수 * unit 크기
 
-	/* warn if maximum distance is further than 75% of vmalloc space */
+	/* warn if maximum distance is further than 75% of vmalloc space */ // 의미 ?
 	if (max_distance > VMALLOC_TOTAL * 3 / 4) {
 		pr_warn("max_distance=0x%lx too large for vmalloc space 0x%lx\n",
 				max_distance, VMALLOC_TOTAL);
@@ -2563,12 +2573,12 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		for (i = 0; i < gi->nr_units; i++, ptr += ai->unit_size) {
 			if (gi->cpu_map[i] == NR_CPUS) {
 				/* unused unit, free whole */
-				free_fn(ptr, ai->unit_size);
+				free_fn(ptr, ai->unit_size); // 사용하지 않는 cpu의 unit들은 메모리 해제
 				continue;
 			}
 			/* copy and return the unused part */
-			memcpy(ptr, __per_cpu_load, ai->static_size);
-			free_fn(ptr + size_sum, ai->unit_size - size_sum);
+			memcpy(ptr, __per_cpu_load, ai->static_size); // memcpy(dst,src,size) : 커널 이미지에 있는 값을 복사해서 초기화
+			free_fn(ptr + size_sum, ai->unit_size - size_sum); // group별로 남은 공간 메모리 해제
 		}
 	}
 

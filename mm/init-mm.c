@@ -35,6 +35,6 @@ struct mm_struct init_mm = {
 	.arg_lock	=  __SPIN_LOCK_UNLOCKED(init_mm.arg_lock),
 	.mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
 	.user_ns	= &init_user_ns,
-	.cpu_bitmap	= { [BITS_TO_LONGS(NR_CPUS)] = 0},
+	.cpu_bitmap	= { [BITS_TO_LONGS(NR_CPUS)] = 0}, // GCC는 배열의 마지막 요소 뿐만 아니라, 모든 요소를 0으로 초기화 한다
 	INIT_MM_CONTEXT(init_mm)
 };

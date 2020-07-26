@@ -135,16 +135,16 @@ static void __init smp_build_mpidr_hash(void)
 	 * Find and stash the last and first bit set at all affinity levels to
 	 * check how many bits are required to represent them.
 	 */
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < 4; i++) { // 4 level (1 level = 1 byte) affinity @ ARM64
 		affinity = MPIDR_AFFINITY_LEVEL(mask, i);
 		/*
 		 * Find the MSB bit and LSB bits position
 		 * to determine how many bits are required
 		 * to express the affinity level.
 		 */
-		ls = fls(affinity);
-		fs[i] = affinity ? ffs(affinity) - 1 : 0;
-		bits[i] = ls - fs[i];
+		ls = fls(affinity); // fls : find last (most-significant) bit set - Note fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
+		fs[i] = affinity ? ffs(affinity) - 1 : 0; // ffs : find first bit set - 상위에서 몇번째 비트가 첫번째 1인 비트인지를 계산
+		bits[i] = ls - fs[i]; // 0000 1100 이면,  ls = 4, fs[0] = 2
 	}
 	/*
 	 * An index can be created from the MPIDR_EL1 by isolating the
@@ -224,10 +224,10 @@ static void __init request_standard_resources(void)
 
 	for_each_memblock(memory, region) {
 		res = &standard_resources[i++];
-		if (memblock_is_nomap(region)) {
+		if (memblock_is_nomap(region)) { // removed region @ memblock. This is not the same as 'memoblock.reserved'
 			res->name  = "reserved";
 			res->flags = IORESOURCE_MEM;
-		} else {
+		} else { 
 			res->name  = "System RAM";
 			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 		}

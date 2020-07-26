@@ -508,7 +508,7 @@ struct mm_struct {
 	 * The mm_cpumask needs to be at the end of mm_struct, because it
 	 * is dynamically sized based on nr_cpu_ids.
 	 */
-	unsigned long cpu_bitmap[];
+	unsigned long cpu_bitmap[]; // Flexible Array Members (초기화시 배열의 길이가 결정되는 GCC 컴파일러의 기능)
 };
 
 extern struct mm_struct init_mm;
@@ -519,7 +519,7 @@ static inline void mm_init_cpumask(struct mm_struct *mm)
 	unsigned long cpu_bitmap = (unsigned long)mm;
 
 	cpu_bitmap += offsetof(struct mm_struct, cpu_bitmap);
-	cpumask_clear((struct cpumask *)cpu_bitmap);
+	cpumask_clear((struct cpumask *)cpu_bitmap); // Flexible Array Members 가 0으로 초기화 되지 않는 컴파일러를 위해 한번 더 초기화
 }
 
 /* Future-safe accessor for struct mm_struct's cpu_vm_mask. */
