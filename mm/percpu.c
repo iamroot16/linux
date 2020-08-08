@@ -219,7 +219,7 @@ static bool pcpu_addr_in_chunk(struct pcpu_chunk *chunk, void *addr)
 static int __pcpu_size_to_slot(int size)
 {
 	int highbit = fls(size);	/* size is in bytes */
-	return max(highbit - PCPU_SLOT_BASE_SHIFT + 2, 1);
+	return max(highbit - PCPU_SLOT_BASE_SHIFT + 2, 1); // ex) 32K = 2^15, (31 - 15) - 5 + 2 = 13
 }
 
 static int pcpu_size_to_slot(int size)
@@ -690,6 +690,9 @@ static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 	 * are [start, end).  e_index always points to the last block in the
 	 * range.
 	 */
+	// 4 byte -> 1 bit @ bitmap, 1 page(4K) -> 1 md_blocks or 1K bitmap
+	// pcpu_off_to_block_index() - divide by PCPU_BITMAP_BLOCK_BITS(1K), 비트맵으로부터 몇번째 블럭(페이지)인지를 계산
+	// pcpu_off_to_block_off() - and with PCPU_BITMAP_BLOCK_BITS(1K) - 1, 비트맵으로부터 블럭(페이지)내의 옵셋 계산
 	s_index = pcpu_off_to_block_index(bit_off);
 	e_index = pcpu_off_to_block_index(bit_off + bits - 1);
 	s_off = pcpu_off_to_block_off(bit_off);
@@ -705,7 +708,7 @@ static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 	 * restore this hint.
 	 */
 	if (s_off == s_block->first_free)
-		s_block->first_free = find_next_zero_bit(
+		s_block->first_free = find_next_zero_bit( // find_next_zero_bit(p, sz, off) 메모리 p(사이즈 sz) 의 off 번째 비트부터 첫번째 찾은 0 인 비트값을 돌려줌 (LSB->MSB)
 					pcpu_index_alloc_map(chunk, s_index),
 					PCPU_BITMAP_BLOCK_BITS,
 					s_off + bits);
@@ -1061,7 +1064,7 @@ static void pcpu_init_md_blocks(struct pcpu_chunk *chunk)
 	for (md_block = chunk->md_blocks;
 	     md_block != chunk->md_blocks + pcpu_chunk_nr_blocks(chunk);
 	     md_block++) {
-		md_block->contig_hint = PCPU_BITMAP_BLOCK_BITS;
+		md_block->contig_hint = PCPU_BITMAP_BLOCK_BITS; // 1K (4K >> 2)
 		md_block->left_free = PCPU_BITMAP_BLOCK_BITS;
 		md_block->right_free = PCPU_BITMAP_BLOCK_BITS;
 	}
@@ -1098,12 +1101,12 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	 * PCPU_BITMAP_BLOCK_SIZE.  One of these constants is a multiple of
 	 * the other.
 	 */
-	lcm_align = lcm(PAGE_SIZE, PCPU_BITMAP_BLOCK_SIZE);
+	lcm_align = lcm(PAGE_SIZE, PCPU_BITMAP_BLOCK_SIZE); // 최소공배수(4K, 4K)로 둘 다에 align
 	region_size = ALIGN(start_offset + map_size, lcm_align);
 
 	/* allocate chunk */
 	alloc_size = sizeof(struct pcpu_chunk) +
-		BITS_TO_LONGS(region_size >> PAGE_SHIFT);
+		BITS_TO_LONGS(region_size >> PAGE_SHIFT); // + region_size의 페이지수를 나타내기 위한 필요한 long 형의 수 (div_round_up)
 	chunk = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
 	if (!chunk)
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
@@ -1116,36 +1119,36 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	chunk->end_offset = region_size - chunk->start_offset - map_size;
 
 	chunk->nr_pages = region_size >> PAGE_SHIFT;
-	region_bits = pcpu_chunk_map_bits(chunk);
+	region_bits = pcpu_chunk_map_bits(chunk); // # of bit map = # of bits for a chunk / # of bits for a word
 
 	alloc_size = BITS_TO_LONGS(region_bits) * sizeof(chunk->alloc_map[0]);
-	chunk->alloc_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
+	chunk->alloc_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES); // BITS_TO_LONGS(region_bits) of alloc_map[]
 	if (!chunk->alloc_map)
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      alloc_size);
 
 	alloc_size =
 		BITS_TO_LONGS(region_bits + 1) * sizeof(chunk->bound_map[0]);
-	chunk->bound_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
+	chunk->bound_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES); // BITS_TO_LONGS(region_bits + 1) of bound_map[]
 	if (!chunk->bound_map)
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      alloc_size);
 
 	alloc_size = pcpu_chunk_nr_blocks(chunk) * sizeof(chunk->md_blocks[0]);
-	chunk->md_blocks = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
+	chunk->md_blocks = memblock_alloc(alloc_size, SMP_CACHE_BYTES); // chunk->nr_pages of md_blocks[] (1 page -> 1 md_block)
 	if (!chunk->md_blocks)
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      alloc_size);
 
 	pcpu_init_md_blocks(chunk);
 
-	/* manage populated page bitmap */
+	/* manage populated page bitmap */ // first chunk는 이미 활성화(populated)되어 있으므로 이에 대한 처리를 한다.
 	chunk->immutable = true;
-	bitmap_fill(chunk->populated, chunk->nr_pages);
+	bitmap_fill(chunk->populated, chunk->nr_pages); // nr_pages bits set as (1)
 	chunk->nr_populated = chunk->nr_pages;
 	chunk->nr_empty_pop_pages =
-		pcpu_cnt_pop_pages(chunk, start_offset / PCPU_MIN_ALLOC_SIZE,
-				   map_size / PCPU_MIN_ALLOC_SIZE);
+		pcpu_cnt_pop_pages(chunk, start_offset / PCPU_MIN_ALLOC_SIZE, // PCPU_MIN_ALLOC_SIZE : 4byte
+				   map_size / PCPU_MIN_ALLOC_SIZE); // region안의 관리되는 영역의 페이지수
 
 	chunk->contig_bits = map_size / PCPU_MIN_ALLOC_SIZE;
 	chunk->free_bytes = map_size;
@@ -1153,11 +1156,11 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	if (chunk->start_offset) {
 		/* hide the beginning of the bitmap */
 		offset_bits = chunk->start_offset / PCPU_MIN_ALLOC_SIZE;
-		bitmap_set(chunk->alloc_map, 0, offset_bits);
-		set_bit(0, chunk->bound_map);
-		set_bit(offset_bits, chunk->bound_map);
+		bitmap_set(chunk->alloc_map, 0, offset_bits); // not free pages: set 1 from begining (address 0)
+		set_bit(0, chunk->bound_map); // bound @ 0th bit
+		set_bit(offset_bits, chunk->bound_map); // bound @ offset_bits 
 
-		chunk->first_bit = offset_bits;
+		chunk->first_bit = offset_bits; // first pages @ map_size
 
 		pcpu_block_update_hint_alloc(chunk, 0, offset_bits);
 	}
@@ -2092,7 +2095,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	PCPU_SETUP_BUG_ON(!IS_ALIGNED(ai->reserved_size, PCPU_MIN_ALLOC_SIZE));
 	PCPU_SETUP_BUG_ON(!(IS_ALIGNED(PCPU_BITMAP_BLOCK_SIZE, PAGE_SIZE) ||
 			    IS_ALIGNED(PAGE_SIZE, PCPU_BITMAP_BLOCK_SIZE)));
-	PCPU_SETUP_BUG_ON(pcpu_verify_alloc_info(ai) < 0);
+	PCPU_SETUP_BUG_ON(pcpu_verify_alloc_info(ai) < 0); // vmalloc area based @ percpu-vm.c 
 
 	/* process group information and build config tables accordingly */
 	alloc_size = ai->nr_groups * sizeof(group_offsets[0]);
@@ -2107,7 +2110,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      alloc_size);
 
-	alloc_size = nr_cpu_ids * sizeof(unit_map[0]);
+	alloc_size = nr_cpu_ids * sizeof(unit_map[0]); // nr_cpu_ids : set possible cpu id + 1  @ setup_nr_cpu_ids()
 	unit_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
 	if (!unit_map)
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
@@ -2133,26 +2136,26 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 		for (i = 0; i < gi->nr_units; i++) {
 			cpu = gi->cpu_map[i];
-			if (cpu == NR_CPUS)
+			if (cpu == NR_CPUS) // if not mapped with possible cpu, skip the 'unit'
 				continue;
 
 			PCPU_SETUP_BUG_ON(cpu >= nr_cpu_ids);
 			PCPU_SETUP_BUG_ON(!cpu_possible(cpu));
 			PCPU_SETUP_BUG_ON(unit_map[cpu] != UINT_MAX);
 
-			unit_map[cpu] = unit + i;
-			unit_off[cpu] = gi->base_offset + i * ai->unit_size;
+			unit_map[cpu] = unit + i; // cpu와 1:1로 매핑된 유닛의 인덱스
+			unit_off[cpu] = gi->base_offset + i * ai->unit_size; // cpud와 매핑된 유닛의 주소
 
 			/* determine low/high unit_cpu */
 			if (pcpu_low_unit_cpu == NR_CPUS ||
 			    unit_off[cpu] < unit_off[pcpu_low_unit_cpu])
-				pcpu_low_unit_cpu = cpu;
+				pcpu_low_unit_cpu = cpu; // 가장 낮은 유닛의 주소와 매핑된 cpu
 			if (pcpu_high_unit_cpu == NR_CPUS ||
 			    unit_off[cpu] > unit_off[pcpu_high_unit_cpu])
-				pcpu_high_unit_cpu = cpu;
+				pcpu_high_unit_cpu = cpu; // 가장 높은 유닛의 주소와 매핑된 cpu
 		}
 	}
-	pcpu_nr_units = unit;
+	pcpu_nr_units = unit; // 매핑되지 않은 유닛도 포함한 갯수
 
 	for_each_possible_cpu(cpu)
 		PCPU_SETUP_BUG_ON(unit_map[cpu] == UINT_MAX);
@@ -2168,13 +2171,13 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	pcpu_unit_offsets = unit_off;
 
 	/* determine basic parameters */
-	pcpu_unit_pages = ai->unit_size >> PAGE_SHIFT;
-	pcpu_unit_size = pcpu_unit_pages << PAGE_SHIFT;
-	pcpu_atom_size = ai->atom_size;
+	pcpu_unit_pages = ai->unit_size >> PAGE_SHIFT; // 44K / 4K = 11 pages
+	pcpu_unit_size = pcpu_unit_pages << PAGE_SHIFT; // 44K
+	pcpu_atom_size = ai->atom_size; // 4K
 	pcpu_chunk_struct_size = sizeof(struct pcpu_chunk) +
-		BITS_TO_LONGS(pcpu_unit_pages) * sizeof(unsigned long);
+		BITS_TO_LONGS(pcpu_unit_pages) * sizeof(unsigned long); // pcpu_unit_pages을 비트맵 형태로 long자료형에 저장할때 필요한 수
 
-	pcpu_stats_save_ai(ai);
+	pcpu_stats_save_ai(ai); // 빈함수 - CONFIG_PERCPU_STATS가 정의되지 않을때
 
 	/*
 	 * Allocate chunk slots.  The additional last slot is for
@@ -2208,8 +2211,8 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	 * pcpu_first_chunk, will always point to the chunk that serves
 	 * the dynamic region.
 	 */
-	tmp_addr = (unsigned long)base_addr + static_size;
-	map_size = ai->reserved_size ?: dyn_size;
+	tmp_addr = (unsigned long)base_addr + static_size; // reserved가 있으면, reserved의 시작 주소, 아니면 dynamic 시작 주소
+	map_size = ai->reserved_size ?: dyn_size; // x ? : y - x가 0이 아니면 x, 0이면 y
 	chunk = pcpu_alloc_first_chunk(tmp_addr, map_size);
 
 	/* init dynamic chunk if necessary */
@@ -2421,7 +2424,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 
 	/* allocate and fill alloc_info */ 
 	for (group = 0; group < nr_groups; group++)
-		nr_units += roundup(group_cnt[group], upa); // 그룹별로 할당되는 unit 수의 합 
+		nr_units += roundup(group_cnt[group], upa); // 그룹별로 할당되는 unit 수의 합 (비대칭 NUMA에서 cpu에 매핑되지 않는 유닛수도 포함)
 
 	ai = pcpu_alloc_alloc_info(nr_groups, nr_units); // ai : allocation info
 	if (!ai)
@@ -2534,7 +2537,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		BUG_ON(cpu == NR_CPUS);
 
 		/* allocate space for the whole group */
-		ptr = alloc_fn(cpu, gi->nr_units * ai->unit_size, atom_size);
+		ptr = alloc_fn(cpu, gi->nr_units * ai->unit_size, atom_size); // cpu가 속한 노드에 해당하는 그룹의 유닛배열 메모리를 할당
 		if (!ptr) {
 			rc = -ENOMEM;
 			goto out_free_areas;
@@ -2543,12 +2546,12 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		kmemleak_free(ptr);
 		areas[group] = ptr;
 
-		base = min(ptr, base); // base : 가장 낮은 area[] 주소
-		if (ptr > areas[highest_group]) // highest_group : 가장 높은 area[] 주소를 가진 group
+		base = min(ptr, base); // base : 가장 낮은 그룹별 유닛 배열의 시작 주소
+		if (ptr > areas[highest_group]) // highest_group : 가장 높은 유닛 배열의 주소를 가진 그룹
 			highest_group = group;
 	}
-	max_distance = areas[highest_group] - base; // area[] 주소의 차이
-	max_distance += ai->unit_size * ai->groups[highest_group].nr_units; // unit수 * unit 크기
+	max_distance = areas[highest_group] - base; // 가장 큰, 그룹별 유닛 배열의 시작 주소 차이
+	max_distance += ai->unit_size * ai->groups[highest_group].nr_units; // highest group에서의 유닛배열의 크기
 
 	/* warn if maximum distance is further than 75% of vmalloc space */ // 의미 ?
 	if (max_distance > VMALLOC_TOTAL * 3 / 4) {
@@ -2577,7 +2580,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				continue;
 			}
 			/* copy and return the unused part */
-			memcpy(ptr, __per_cpu_load, ai->static_size); // memcpy(dst,src,size) : 커널 이미지에 있는 값을 복사해서 초기화
+			memcpy(ptr, __per_cpu_load, ai->static_size); // memcpy(dst,src,size) : 커널 이미지에 있는 값을 복사해서 static 부분 초기화
 			free_fn(ptr + size_sum, ai->unit_size - size_sum); // group별로 남은 공간 메모리 해제
 		}
 	}
