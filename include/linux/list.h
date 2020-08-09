@@ -79,7 +79,7 @@ static inline void __list_add(struct list_head *new,
  */
 static inline void list_add(struct list_head *new, struct list_head *head)
 {
-	__list_add(new, head, head->next);
+	__list_add(new, head, head->next); // head 뒤에 넣음
 }
 
 
@@ -93,7 +93,7 @@ static inline void list_add(struct list_head *new, struct list_head *head)
  */
 static inline void list_add_tail(struct list_head *new, struct list_head *head)
 {
-	__list_add(new, head->prev, head);
+	__list_add(new, head->prev, head); // head 앞에 넣음
 }
 
 /*

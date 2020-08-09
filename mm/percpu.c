@@ -218,14 +218,14 @@ static bool pcpu_addr_in_chunk(struct pcpu_chunk *chunk, void *addr)
 
 static int __pcpu_size_to_slot(int size)
 {
-	int highbit = fls(size);	/* size is in bytes */
+	int highbit = fls(size);	/* size is in bytes */ // fls() : 셋 되어 있는 마지막 비트의 위치(1->32)를 리턴
 	return max(highbit - PCPU_SLOT_BASE_SHIFT + 2, 1); // ex) 32K = 2^15, (31 - 15) - 5 + 2 = 13
 }
 
 static int pcpu_size_to_slot(int size)
 {
 	if (size == pcpu_unit_size)
-		return pcpu_nr_slots - 1;
+		return pcpu_nr_slots - 1; // empty chunk : slot 최상위 
 	return __pcpu_size_to_slot(size);
 }
 
@@ -268,8 +268,8 @@ static unsigned long pcpu_chunk_addr(struct pcpu_chunk *chunk,
 
 static void pcpu_next_unpop(unsigned long *bitmap, int *rs, int *re, int end)
 {
-	*rs = find_next_zero_bit(bitmap, end, *rs);
-	*re = find_next_bit(bitmap, end, *rs + 1);
+	*rs = find_next_zero_bit(bitmap, end, *rs); // 메모리 p 의 off 번째 비트부터 첫번째 찾은 0 인 비트값을 돌려줌
+	*re = find_next_bit(bitmap, end, *rs + 1); // 메모리 p 의 off 번째 비트부터 첫번째 찾은 1 인 비트값을 돌려줌
 }
 
 static void pcpu_next_pop(unsigned long *bitmap, int *rs, int *re, int end)
@@ -328,21 +328,21 @@ static unsigned long pcpu_block_off_to_off(int index, int off)
  * block->contig_hint and performs aggregation across blocks to find the
  * next hint.  It modifies bit_off and bits in-place to be consumed in the
  * loop.
- */
+ */ // left_free, right_free, contig만을 사용해서 free area를 찾음. input : chunk, bit_off, output : bit_off, bits
 static void pcpu_next_md_free_region(struct pcpu_chunk *chunk, int *bit_off,
 				     int *bits)
 {
-	int i = pcpu_off_to_block_index(*bit_off);
-	int block_off = pcpu_off_to_block_off(*bit_off);
+	int i = pcpu_off_to_block_index(*bit_off); // block index
+	int block_off = pcpu_off_to_block_off(*bit_off); // offset within a block
 	struct pcpu_block_md *block;
 
 	*bits = 0;
 	for (block = chunk->md_blocks + i; i < pcpu_chunk_nr_blocks(chunk);
 	     block++, i++) {
 		/* handles contig area across blocks */
-		if (*bits) {
+		if (*bits) { // 첫 iteration 에서는 안함. contig나 right_free를 사용
 			*bits += block->left_free;
-			if (block->left_free == PCPU_BITMAP_BLOCK_BITS)
+			if (block->left_free == PCPU_BITMAP_BLOCK_BITS) // a empty block
 				continue;
 			return;
 		}
@@ -357,16 +357,16 @@ static void pcpu_next_md_free_region(struct pcpu_chunk *chunk, int *bit_off,
 		 */
 		*bits = block->contig_hint;
 		if (*bits && block->contig_hint_start >= block_off &&
-		    *bits + block->contig_hint_start < PCPU_BITMAP_BLOCK_BITS) {
+		    *bits + block->contig_hint_start < PCPU_BITMAP_BLOCK_BITS) { // contig가 0이 아니고 block_off뒤에서 시작해서 한 블럭안에서 끝나는 경우
 			*bit_off = pcpu_block_off_to_off(i,
 					block->contig_hint_start);
 			return;
 		}
 		/* reset to satisfy the second predicate above */
-		block_off = 0;
+		block_off = 0; // 두번째 iteration(block) 부터는 block offset 없음
 
-		*bits = block->right_free;
-		*bit_off = (i + 1) * PCPU_BITMAP_BLOCK_BITS - block->right_free;
+		*bits = block->right_free; // 0 or 다음 block과 연결될 수 있는 free region
+		*bit_off = (i + 1) * PCPU_BITMAP_BLOCK_BITS - block->right_free; // 앞에서부터의 offset
 	}
 }
 
@@ -503,13 +503,13 @@ static void pcpu_mem_free(void *ptr)
  */
 static void pcpu_chunk_relocate(struct pcpu_chunk *chunk, int oslot)
 {
-	int nslot = pcpu_chunk_slot(chunk);
+	int nslot = pcpu_chunk_slot(chunk); // new slot : # of slot (chuck->free_bytes), return 0 if chunk cannot allocate further
 
-	if (chunk != pcpu_reserved_chunk && oslot != nslot) {
+	if (chunk != pcpu_reserved_chunk && oslot != nslot) { // free_bytes의 오름차순으로 슬롯 0(fully allocted chunk) ~ pcpu_nr_slots - 1(empty chunk)에 정렬 
 		if (oslot < nslot)
-			list_move(&chunk->list, &pcpu_slot[nslot]);
+			list_move(&chunk->list, &pcpu_slot[nslot]); // old slot보다 new slot이 빈공간이 많으면, list 뒤에 넣음
 		else
-			list_move_tail(&chunk->list, &pcpu_slot[nslot]);
+			list_move_tail(&chunk->list, &pcpu_slot[nslot]); // 빈공간이 적으면, list 앞에 넣음
 	}
 }
 
@@ -541,7 +541,7 @@ static inline int pcpu_cnt_pop_pages(struct pcpu_chunk *chunk, int bit_off,
 	 * pages up to page_end and then subtracting the populated pages
 	 * up to page_start to count the populated pages in
 	 * [page_start, page_end).
-	 */
+	 */ // populated -> 1bit = 1 populated page(4K)
 	return bitmap_weight(chunk->populated, page_end) -
 	       bitmap_weight(chunk->populated, page_start);
 }
@@ -562,7 +562,7 @@ static void pcpu_chunk_update(struct pcpu_chunk *chunk, int bit_off, int bits)
 		chunk->contig_bits = bits;
 	} else if (bits == chunk->contig_bits && chunk->contig_bits_start &&
 		   (!bit_off ||
-		    __ffs(bit_off) > __ffs(chunk->contig_bits_start))) {
+		    __ffs(bit_off) > __ffs(chunk->contig_bits_start))) { // __ffs() : 셋 되어 있는 첫 비트의 위치(1->32)를 리턴. 길이가 동일하면 큰 order로 align되는 시작위치로 갱신
 		/* use the start with the best alignment */
 		chunk->contig_bits_start = bit_off;
 	}
@@ -604,9 +604,9 @@ static void pcpu_chunk_refresh_hint(struct pcpu_chunk *chunk)
 	 * chunk is not part of the free page count as they are populated
 	 * at init and are special to serving reserved allocations.
 	 */
-	if (chunk != pcpu_reserved_chunk)
+	if (chunk != pcpu_reserved_chunk) // pcpu_nr_empty_pop_pages은 reserved chuck는 count 안함
 		pcpu_nr_empty_pop_pages +=
-			(nr_empty_pop_pages - chunk->nr_empty_pop_pages);
+			(nr_empty_pop_pages - chunk->nr_empty_pop_pages); // either + or -
 
 	chunk->nr_empty_pop_pages = nr_empty_pop_pages;
 }
@@ -636,7 +636,7 @@ static void pcpu_block_update(struct pcpu_block_md *block, int start, int end)
 		block->contig_hint_start = start;
 		block->contig_hint = contig;
 	} else if (block->contig_hint_start && contig == block->contig_hint &&
-		   (!start || __ffs(start) > __ffs(block->contig_hint_start))) {
+		   (!start || __ffs(start) > __ffs(block->contig_hint_start))) { // __ffs() : 셋 되어 있는 첫 비트의 위치(1->32)를 리턴. 길이가 동일하면 큰 order로 align되는 시작위치로 갱신
 		/* use the start with the best alignment */
 		block->contig_hint_start = start;
 	}
@@ -657,13 +657,13 @@ static void pcpu_block_refresh_hint(struct pcpu_chunk *chunk, int index)
 	int rs, re;	/* region start, region end */
 
 	/* clear hints */
-	block->contig_hint = 0;
-	block->left_free = block->right_free = 0;
+	block->contig_hint = 0; // 페이지가 모두 할당된 경우
+	block->left_free = block->right_free = 0; // 좌측끝, 우측 끝에 빈공간이 없는 경우
 
 	/* iterate over free areas and update the contig hints */
 	pcpu_for_each_unpop_region(alloc_map, rs, re, block->first_free,
-				   PCPU_BITMAP_BLOCK_BITS) {
-		pcpu_block_update(block, rs, re);
+				   PCPU_BITMAP_BLOCK_BITS) { // alloc_map에서 0인 위치만을 순회 (unpopulated)
+		pcpu_block_update(block, rs, re); // 빈공간 [rs, re)에 대해 update
 	}
 }
 
@@ -676,7 +676,7 @@ static void pcpu_block_refresh_hint(struct pcpu_chunk *chunk, int index)
  * Updates metadata for the allocation path.  The metadata only has to be
  * refreshed by a full scan iff the chunk's contig hint is broken.  Block level
  * scans are required if the block's contig hint is broken.
- */
+ */ // bit_off부터 bits길이 만큼 allocation되어 있으므로 이에 대한 md_block update를 한다
 static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 					 int bits)
 {
@@ -741,7 +741,7 @@ static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 
 		if (e_off == PCPU_BITMAP_BLOCK_BITS) {
 			/* reset the block */
-			e_block++;
+			e_block++; // 모두 alloc된 경우, 아래 for문에서 처리
 		} else {
 			if (e_off > e_block->contig_hint_start) {
 				/* contig hint is broken - scan to fix it */
@@ -754,7 +754,7 @@ static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 			}
 		}
 
-		/* update in-between md_blocks */
+		/* update in-between md_blocks */ // 모두 alloc된 경우
 		for (block = s_block + 1; block < e_block; block++) {
 			block->contig_hint = 0;
 			block->left_free = 0;
@@ -766,7 +766,7 @@ static void pcpu_block_update_hint_alloc(struct pcpu_chunk *chunk, int bit_off,
 	 * The only time a full chunk scan is required is if the chunk
 	 * contig hint is broken.  Otherwise, it means a smaller space
 	 * was used and therefore the chunk contig hint is still correct.
-	 */
+	 */ // s_block 또는 e_block 안에서 contig를 갱신 한것으로 충분하지 않은 경우, chunk단위로 갱신 
 	if (bit_off >= chunk->contig_bits_start  &&
 	    bit_off < chunk->contig_bits_start + chunk->contig_bits)
 		pcpu_chunk_refresh_hint(chunk);
@@ -1156,11 +1156,11 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	if (chunk->start_offset) {
 		/* hide the beginning of the bitmap */
 		offset_bits = chunk->start_offset / PCPU_MIN_ALLOC_SIZE;
-		bitmap_set(chunk->alloc_map, 0, offset_bits); // not free pages: set 1 from begining (address 0)
-		set_bit(0, chunk->bound_map); // bound @ 0th bit
-		set_bit(offset_bits, chunk->bound_map); // bound @ offset_bits 
+		bitmap_set(chunk->alloc_map, 0, offset_bits); // start_offset : not free pages, set 1 @ allocation map
+		set_bit(0, chunk->bound_map); // begining of start_offset : bound @ 0th bit
+		set_bit(offset_bits, chunk->bound_map); // end of start_offset : bound @ offset_bits 
 
-		chunk->first_bit = offset_bits; // first pages @ map_size
+		chunk->first_bit = offset_bits; // the first empty page right after start_offset 
 
 		pcpu_block_update_hint_alloc(chunk, 0, offset_bits);
 	}
@@ -2190,7 +2190,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		panic("%s: Failed to allocate %zu bytes\n", __func__,
 		      pcpu_nr_slots * sizeof(pcpu_slot[0]));
 	for (i = 0; i < pcpu_nr_slots; i++)
-		INIT_LIST_HEAD(&pcpu_slot[i]);
+		INIT_LIST_HEAD(&pcpu_slot[i]); // prev, next가 자신을 가리키도록 초기화
 
 	/*
 	 * The end of the static region needs to be aligned with the
@@ -2216,7 +2216,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	chunk = pcpu_alloc_first_chunk(tmp_addr, map_size);
 
 	/* init dynamic chunk if necessary */
-	if (ai->reserved_size) {
+	if (ai->reserved_size) { // 위에서 reserved_size를 처리했으면 dynamic에 대해 마찬가지로 처리한다
 		pcpu_reserved_chunk = chunk;
 
 		tmp_addr = (unsigned long)base_addr + static_size +
@@ -2233,11 +2233,11 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	/* include all regions of the first chunk */
 	pcpu_nr_populated += PFN_DOWN(size_sum);
 
-	pcpu_stats_chunk_alloc();
+	pcpu_stats_chunk_alloc(); // 빈함수
 	trace_percpu_create_chunk(base_addr);
 
 	/* we're done */
-	pcpu_base_addr = base_addr;
+	pcpu_base_addr = base_addr; // 모든 group의 unit중 가장 작은 주소
 	return 0;
 }
 
@@ -2553,7 +2553,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 	max_distance = areas[highest_group] - base; // 가장 큰, 그룹별 유닛 배열의 시작 주소 차이
 	max_distance += ai->unit_size * ai->groups[highest_group].nr_units; // highest group에서의 유닛배열의 크기
 
-	/* warn if maximum distance is further than 75% of vmalloc space */ // 의미 ?
+	/* warn if maximum distance is further than 75% of vmalloc space */
 	if (max_distance > VMALLOC_TOTAL * 3 / 4) {
 		pr_warn("max_distance=0x%lx too large for vmalloc space 0x%lx\n",
 				max_distance, VMALLOC_TOTAL);

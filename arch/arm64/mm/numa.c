@@ -199,7 +199,7 @@ void __init setup_per_cpu_areas(void)
 
 	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
 	for_each_possible_cpu(cpu)
-		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
+		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu]; // per-cpu 데이터(cpu마다 있는 변수)에 접근하려면 percpu variable(1개만 있는 변수)에 cpu 번호마다 지정된 offset 값을 더해야 하는데 그 offset 값 들이 저장된 전역 변수 배열이다.
 }
 #endif
 
