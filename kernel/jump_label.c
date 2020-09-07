@@ -396,6 +396,7 @@ static void __jump_label_update(struct static_key *key,
 
 void __init jump_label_init(void)
 {
+	// vmlinux.lds.h 에 RO_AFTER_INIT_DATA 사이에 정의 되어 있다
 	struct jump_entry *iter_start = __start___jump_table;
 	struct jump_entry *iter_stop = __stop___jump_table;
 	struct static_key *key = NULL;
@@ -407,12 +408,17 @@ void __init jump_label_init(void)
 	 * jump_label.h, let's make sure that is safe. There are only two
 	 * cases to check since we initialize to 0 or 1.
 	 */
+	// jump_label.h 에 atomic.h 를 include 할 수 없어(충돌?) 원시값으로
+	// 초기화 하였는데 문제가 없는지 여기서 검사한다.
+	// 원래 ATOMIC_INIT(1) 등으로 enabled 멤버를 초기화 하여야 하지만
+	// (archtecture 에 따라 atomic_t 타입이 바뀔수 있다.)
+	// 원시값으로 초기화 하였기 때문에 문제가 없는지 검사한다.
 	BUILD_BUG_ON((int)ATOMIC_INIT(0) != 0);
 	BUILD_BUG_ON((int)ATOMIC_INIT(1) != 1);
 
 	if (static_key_initialized)
 		return;
-
+	// TODO: lock관련 함수들 보기
 	cpus_read_lock();
 	jump_label_lock();
 	jump_label_sort_entries(iter_start, iter_stop);

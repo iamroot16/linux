@@ -434,6 +434,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_boot_cpu(void)
 {
+	// __per_cpu_offset[] 배열에서 현재 cpu id를 index로 한
+	// 값을 읽어와 tpidr_el1 레지스터에 저장한다.
 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
 	/*
 	 * Initialise the static keys early as they may be enabled by the
