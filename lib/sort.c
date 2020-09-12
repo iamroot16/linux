@@ -91,7 +91,7 @@ void sort(void *base, size_t num, size_t size,
 	/* sort */ // 모든 노드에 대해 오름 차순 정렬 (최상위 노드가 최소값)
 	for (i = n - size; i > 0; i -= size) { // 가장 마지막 노드에서 시작 
 		swap_func(base, base + i, size); // 최상위 노드와 swap하여 큰값을 하위로 보냄
-		for (r = 0; r * 2 + size < i; r = c) // 위의 heapify와 동일코드
+		for (r = 0; r * 2 + size < i; r = c) { // 위의 heapify와 동일코드
 			c = r * 2 + size;
 			if (c < i - size &&
 					cmp_func(base + c, base + c + size) < 0)
