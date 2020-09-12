@@ -57,7 +57,7 @@ static void generic_swap(void *a, void *b, int size)
  * qsort is about 20% faster on average, it suffers from exploitable
  * O(n*n) worst-case behavior and extra memory requirements that make
  * it less suitable for kernel use.
- */
+ */ // 참조 - https://www.youtube.com/watch?v=S42s_ANn4c4 https://gmlwjd9405.github.io/2018/05/10/algorithm-heap-sort.html
 
 void sort(void *base, size_t num, size_t size,
 	  int (*cmp_func)(const void *, const void *),
@@ -66,7 +66,7 @@ void sort(void *base, size_t num, size_t size,
 	/* pre-scale counters for performance */
 	int i = (num/2 - 1) * size, n = num * size, c, r;
 
-	if (!swap_func) {
+	if (!swap_func) { // size와 base의 align에 따라 swap 함수 포인터 설정
 		if (size == 4 && alignment_ok(base, 4))
 			swap_func = u32_swap;
 		else if (size == 8 && alignment_ok(base, 8))
@@ -75,23 +75,23 @@ void sort(void *base, size_t num, size_t size,
 			swap_func = generic_swap;
 	}
 
-	/* heapify */
-	for ( ; i >= 0; i -= size) {
-		for (r = i; r * 2 + size < n; r  = c) {
-			c = r * 2 + size;
+	/* heapify */ // max heap
+	for ( ; i >= 0; i -= size) { // 제일 마지막 노드의 부모에서 부터 시작
+		for (r = i; r * 2 + size < n; r  = c) { // 유효한 노드면, 부모의 부모로 이동
+			c = r * 2 + size; // 부모인덱스 : r, 자식인덱스 : c, c + 1
 			if (c < n - size &&
-					cmp_func(base + c, base + c + size) < 0)
+					cmp_func(base + c, base + c + size) < 0) // 부모(r)의 두 자식간의 비교
 				c += size;
-			if (cmp_func(base + r, base + c) >= 0)
+			if (cmp_func(base + r, base + c) >= 0) // 부모가 더 큰경우
 				break;
-			swap_func(base + r, base + c, size);
+			swap_func(base + r, base + c, size); // 부모와 자식을 swap
 		}
 	}
 
-	/* sort */
-	for (i = n - size; i > 0; i -= size) {
-		swap_func(base, base + i, size);
-		for (r = 0; r * 2 + size < i; r = c) {
+	/* sort */ // 모든 노드에 대해 오름 차순 정렬 (최상위 노드가 최소값)
+	for (i = n - size; i > 0; i -= size) { // 가장 마지막 노드에서 시작 
+		swap_func(base, base + i, size); // 최상위 노드와 swap하여 큰값을 하위로 보냄
+		for (r = 0; r * 2 + size < i; r = c) // 위의 heapify와 동일코드
 			c = r * 2 + size;
 			if (c < i - size &&
 					cmp_func(base + c, base + c + size) < 0)
