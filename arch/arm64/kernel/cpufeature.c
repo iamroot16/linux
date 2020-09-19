@@ -450,9 +450,12 @@ static struct arm64_ftr_reg *get_arm64_ftr_reg(u32 sys_id)
 static u64 arm64_ftr_set_value(const struct arm64_ftr_bits *ftrp, s64 reg,
 			       s64 ftr_val)
 {
+	// same value ftr_mask
 	u64 mask = arm64_ftr_mask(ftrp);
 
+	// ~0x80000000 -> 0xffffffff7fffffff
 	reg &= ~mask;
+	// width<<ftrp->shift (ie. 31) & mask
 	reg |= (ftr_val << ftrp->shift) & mask;
 	return reg;
 }
@@ -503,13 +506,16 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
 
 	const struct arm64_ftr_bits *ftrp;
 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
-
+	// if not found, BUG_ON.
 	BUG_ON(!reg);
 
+	// loop till meet ARM64_FTR_END(.width = 0).
 	for (ftrp  = reg->ftr_bits; ftrp->width; ftrp++) {
-		u64 ftr_mask = arm64_ftr_mask(ftrp);
+		u64 ftr_mask = arm64_ftr_mask(ftrp);	// ie 31,1 -> 0x80000000
+		// new <- previous "cpuinfo_store_cpu(info)"
 		s64 ftr_new = arm64_ftr_value(ftrp, new);
-
+		// 0x00000000000[width] remain.
+								//____, 0,  0x0000[width]
 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
 
 		valid_mask |= ftr_mask;
