@@ -47,7 +47,7 @@ static int jump_label_cmp(const void *a, const void *b)
 
 static void jump_label_swap(void *a, void *b, int size)
 {
-	long delta = (unsigned long)a - (unsigned long)b;
+	long delta = (unsigned long)a - (unsigned long)b; // diffrence of current a/b addresses
 	struct jump_entry *jea = a;
 	struct jump_entry *jeb = b;
 	struct jump_entry tmp = *jea;
@@ -361,7 +361,7 @@ static void static_key_set_entries(struct static_key *key,
 	WARN_ON_ONCE((unsigned long)entries & JUMP_TYPE_MASK);
 	type = key->type & JUMP_TYPE_MASK;
 	key->entries = entries;
-	key->type |= type;
+	key->type |= type; // union 이므로 entries 복사로 지워진 type을 다시 쓴다
 }
 
 static enum jump_label_type jump_label_type(struct jump_entry *entry)
@@ -421,24 +421,24 @@ void __init jump_label_init(void)
 	// TODO: lock관련 함수들 보기
 	cpus_read_lock();
 	jump_label_lock();
-	jump_label_sort_entries(iter_start, iter_stop);
+	jump_label_sort_entries(iter_start, iter_stop); // __jump_table에 있는 jump_entry 구조체의 key(하위 2비트를 제외한)로 오름차순 정렬 (힙정렬)
 
-	for (iter = iter_start; iter < iter_stop; iter++) {
+	for (iter = iter_start; iter < iter_stop; iter++) { // jump_table을 순회하면서 XXX를 초기화 한다
 		struct static_key *iterk;
 
 		/* rewrite NOPs */
-		if (jump_label_type(iter) == JUMP_LABEL_NOP)
-			arch_jump_label_transform_static(iter, JUMP_LABEL_NOP);
+		if (jump_label_type(iter) == JUMP_LABEL_NOP) // dynamic(런타임) : enable ^ branch 이 JUMP_LABEL_NOP(0)이면 nop
+			arch_jump_label_transform_static(iter, JUMP_LABEL_NOP); // ARM64의 경우는 컴파일 타임에 nop 명령을 사용하여 이미 초기화된 상태라 별도로 nop 코드를 rewrite 할 필요 없다
 
-		if (init_section_contains((void *)jump_entry_code(iter), 1))
-			jump_entry_set_init(iter);
+		if (init_section_contains((void *)jump_entry_code(iter), 1)) // jump_entry 구조체의 code 1바이트가 init section에 있는지 확인
+			jump_entry_set_init(iter); // key의 아래에서 두번째 비트를 1로 설정
 
-		iterk = jump_entry_key(iter);
-		if (iterk == key)
+		iterk = jump_entry_key(iter); // 아래 2비트를 mask한 key
+		if (iterk == key) // 위에서 key 주소로 정렬했으므로, 이전(key)과 동일한 static key를 사용하는 jump 라벨 엔트리인(iterk) 경우 처리 안하고 continue
 			continue;
 
 		key = iterk;
-		static_key_set_entries(key, iter);
+		static_key_set_entries(key, iter); // static_key key에 jump_entry* iter를 복사한다
 	}
 	static_key_initialized = true;
 	jump_label_unlock();
@@ -454,7 +454,7 @@ static enum jump_label_type jump_label_init_type(struct jump_entry *entry)
 	bool branch = jump_entry_is_branch(entry);
 
 	/* See the comment in linux/jump_label.h */
-	return type ^ branch;
+	return type ^ branch; // static(컴파일) : type ^ branch 이 JUMP_LABEL_NOP(0)이면 nop
 }
 
 struct static_key_mod {
