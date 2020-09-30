@@ -38,17 +38,17 @@ void *bsearch(const void *key, const void *base, size_t num, size_t size,
 	int result;
 
 	while (num > 0) {
-		pivot = base + (num >> 1) * size;
+		pivot = base + (num >> 1) * size; // center element
 		result = cmp(key, pivot);
 
-		if (result == 0)
+		if (result == 0) // found
 			return (void *)pivot;
 
-		if (result > 0) {
+		if (result > 0) { // select second half
 			base = pivot + size;
 			num--;
 		}
-		num >>= 1;
+		num >>= 1; // divide into 2
 	}
 
 	return NULL;

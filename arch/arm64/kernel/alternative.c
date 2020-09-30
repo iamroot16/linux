@@ -185,10 +185,10 @@ static void __apply_alternatives(void *alt_region,  bool is_module,
 		updptr = is_module ? origptr : lm_alias(origptr);
 		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
 
-		if (alt->cpufeature < ARM64_CB_PATCH)
-			alt_cb = patch_alternative;
+		if (alt->cpufeature < ARM64_CB_PATCH) 	// check whether the cpu feature exists
+			alt_cb = patch_alternative; 	// patch alternative instruction
 		else
-			alt_cb  = ALT_REPL_PTR(alt);
+			alt_cb  = ALT_REPL_PTR(alt);	// use call back function
 
 		alt_cb(alt, origptr, updptr, nr_inst);
 

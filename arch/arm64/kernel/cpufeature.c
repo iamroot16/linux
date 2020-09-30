@@ -437,7 +437,7 @@ static struct arm64_ftr_reg *get_arm64_ftr_reg(u32 sys_id)
 {
 	const struct __ftr_reg_entry *ret;
 
-	ret = bsearch((const void *)(unsigned long)sys_id,
+	ret = bsearch((const void *)(unsigned long)sys_id, // binary search
 			arm64_ftr_regs,
 			ARRAY_SIZE(arm64_ftr_regs),
 			sizeof(arm64_ftr_regs[0]),
@@ -515,15 +515,15 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
 		// new <- previous "cpuinfo_store_cpu(info)"
 		s64 ftr_new = arm64_ftr_value(ftrp, new);
 		// 0x00000000000[width] remain.
-								//____, 0,  0x0000[width]
+		//____, 0,  0x0000[width]
 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
 
 		valid_mask |= ftr_mask;
 		if (!ftrp->strict)
 			strict_mask &= ~ftr_mask;
-		if (ftrp->visible)
+		if (ftrp->visible) // 해당 필드가 유저 접근을 허용하는 경우, user_mask에 ftr_mask을 포함시킨다. 
 			user_mask |= ftr_mask;
-		else
+		else // 유저 접근을 허용하지 않는 경우, user_val에 safe_val비트를 OR한다.
 			reg->user_val = arm64_ftr_set_value(ftrp,
 							    reg->user_val,
 							    ftrp->safe_val);
@@ -609,7 +609,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
 	 * Initialize the indirect array of CPU hwcaps capabilities pointers
 	 * before we handle the boot CPU below.
 	 */
-	init_cpu_hwcaps_indirect_list();
+	init_cpu_hwcaps_indirect_list(); // arm64_features 와 arm64_errata 포인터를 hwcaps_indirect_list에 저장
 
 	/*
 	 * Detect and enable early CPU capabilities based on the boot CPU,
@@ -1761,7 +1761,7 @@ static void __init enable_cpu_capabilities(u16 scope_mask)
 			 * enabled here. This approach avoids costly
 			 * stop_machine() calls for this case.
 			 */
-			caps->cpu_enable(caps);
+			caps->cpu_enable(caps); // feature와 errata에 해당하는 cpu_enable 함수를 호출하여 초기화 함
 	}
 
 	/*

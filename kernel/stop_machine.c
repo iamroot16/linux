@@ -608,7 +608,7 @@ int stop_machine_cpuslocked(cpu_stop_fn_t fn, void *data,
 		ret = (*fn)(data);
 		local_irq_restore(flags);
 
-		return ret;
+		return ret; // 처음에는 여기서 빠져나간다
 	}
 
 	/* Set the initial state and stop all online cpus. */

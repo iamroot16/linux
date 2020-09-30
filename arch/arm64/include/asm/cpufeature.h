@@ -464,7 +464,7 @@ cpuid_feature_extract_unsigned_field(u64 features, int field)
 
 static inline u64 arm64_ftr_mask(const struct arm64_ftr_bits *ftrp)
 {
-	return (u64)GENMASK(ftrp->shift + ftrp->width - 1, ftrp->shift);
+	return (u64)GENMASK(ftrp->shift + ftrp->width - 1, ftrp->shift); // shift=21, width=19 -> 0x0000_00ff_ffe0_0000
 }
 
 static inline u64 arm64_ftr_reg_user_value(const struct arm64_ftr_reg *reg)
