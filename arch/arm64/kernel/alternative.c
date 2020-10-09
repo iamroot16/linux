@@ -82,7 +82,7 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
 		s32 offset = aarch64_get_branch_offset(insn);
 		unsigned long target;
 
-		target = (unsigned long)altinsnptr + offset;
+		target = (unsigned long)altinsnptr + offset; // alternative instruction이 branch할 target 주소
 
 		/*
 		 * If we're branching inside the alternate sequence,
@@ -161,7 +161,7 @@ static void __apply_alternatives(void *alt_region,  bool is_module,
 	struct alt_instr *alt;
 	struct alt_region *region = alt_region;
 	__le32 *origptr, *updptr;
-	alternative_cb_t alt_cb;
+	alternative_cb_t alt_cb; 
 
 	for (alt = region->begin; alt < region->end; alt++) {
 		int nr_inst;
@@ -190,7 +190,7 @@ static void __apply_alternatives(void *alt_region,  bool is_module,
 		else
 			alt_cb  = ALT_REPL_PTR(alt);	// use call back function
 
-		alt_cb(alt, origptr, updptr, nr_inst);
+		alt_cb(alt, origptr, updptr, nr_inst);	// function pointer (alternative capability)
 
 		if (!is_module) {
 			clean_dcache_range_nopatch((u64)origptr,

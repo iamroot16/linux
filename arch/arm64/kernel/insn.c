@@ -80,7 +80,7 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
 }
 
 bool aarch64_insn_is_branch_imm(u32 insn)
-{
+{ 	// macro 'aarch64_insn_is_##abbr(u32 code)' in insn.h
 	return (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn) ||
 		aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn) ||
 		aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
@@ -295,9 +295,9 @@ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
 }
 
 #define ADR_IMM_HILOSPLIT	2
-#define ADR_IMM_SIZE		SZ_2M
-#define ADR_IMM_LOMASK		((1 << ADR_IMM_HILOSPLIT) - 1)
-#define ADR_IMM_HIMASK		((ADR_IMM_SIZE >> ADR_IMM_HILOSPLIT) - 1)
+#define ADR_IMM_SIZE		SZ_2M // 0x00200000
+#define ADR_IMM_LOMASK		((1 << ADR_IMM_HILOSPLIT) - 1) // 하위 2비트
+#define ADR_IMM_HIMASK		((ADR_IMM_SIZE >> ADR_IMM_HILOSPLIT) - 1) // 0x0007FFFF (19비트)
 #define ADR_IMM_LOSHIFT		29
 #define ADR_IMM_HISHIFT		5
 
@@ -307,11 +307,11 @@ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn)
 	int shift;
 
 	switch (type) {
-	case AARCH64_INSN_IMM_ADR:
+	case AARCH64_INSN_IMM_ADR: // special case : immediate value is splited into two parts. ex) ADRP
 		shift = 0;
-		immlo = (insn >> ADR_IMM_LOSHIFT) & ADR_IMM_LOMASK;
-		immhi = (insn >> ADR_IMM_HISHIFT) & ADR_IMM_HIMASK;
-		insn = (immhi << ADR_IMM_HILOSPLIT) | immlo;
+		immlo = (insn >> ADR_IMM_LOSHIFT) & ADR_IMM_LOMASK; // 30~29bit -> 1~0bit
+		immhi = (insn >> ADR_IMM_HISHIFT) & ADR_IMM_HIMASK; // 23~5bit -> 18~0bit
+		insn = (immhi << ADR_IMM_HILOSPLIT) | immlo; // 20~2bit | 1~0bit
 		mask = ADR_IMM_SIZE - 1;
 		break;
 	default:
@@ -1305,7 +1305,7 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
 {
 	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn))
 		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,
-						     offset >> 2);
+						     offset >> 2); // offset : div 4
 
 	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
 	    aarch64_insn_is_bcond(insn))
