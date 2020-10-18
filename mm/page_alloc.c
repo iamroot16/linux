@@ -5310,7 +5310,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
-	zoneref->zone_idx = zone_idx(zone);
+	zoneref->zone_idx = zone_idx(zone); // 0 : DMA, 1: NORMAL
 }
 
 /*
@@ -5325,9 +5325,9 @@ static int build_zonerefs_node(pg_data_t *pgdat, struct zoneref *zonerefs)
 	int nr_zones = 0;
 
 	do {
-		zone_type--;
+		zone_type--; // MOVABLE->NORMAL->DMA
 		zone = pgdat->node_zones + zone_type;
-		if (managed_zone(zone)) {
+		if (managed_zone(zone)) { // managed pages by buddy system
 			zoneref_set_zone(zone, &zonerefs[nr_zones++]);
 			check_highest_zone(zone_type);
 		}
@@ -5436,7 +5436,7 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
 
 		/* Slight preference for less loaded node */
 		val *= (MAX_NODE_LOAD*MAX_NUMNODES);
-		val += node_load[n];
+		val += node_load[n]; // 노드별 가중치
 
 		if (val < min_val) {
 			min_val = val;
@@ -5445,7 +5445,7 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
 	}
 
 	if (best_node >= 0)
-		node_set(best_node, *used_node_mask);
+		node_set(best_node, *used_node_mask); // 노드가 한번 best_node로 정해지면, 위의 for문 안에서 continue하여, 다시 best node인지 계산하지 않음
 
 	return best_node;
 }
@@ -5472,8 +5472,8 @@ static void build_zonelists_in_node_order(pg_data_t *pgdat, int *node_order,
 		nr_zones = build_zonerefs_node(node, zonerefs);
 		zonerefs += nr_zones;
 	}
-	zonerefs->zone = NULL;
-	zonerefs->zone_idx = 0;
+	zonerefs->zone = NULL; 	// 배열의 끝을 표시
+	zonerefs->zone_idx = 0;	// 배열의 끝을 표시
 }
 
 /*
@@ -5527,8 +5527,8 @@ static void build_zonelists(pg_data_t *pgdat)
 		load--;
 	}
 
-	build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
-	build_thisnode_zonelists(pgdat);
+	build_zonelists_in_node_order(pgdat, node_order, nr_nodes); // 전체노드 대상(node fallback) : pgdat->node_zonelists[ZONELIST_FALLBACK]
+	build_thisnode_zonelists(pgdat); // 현재노드 대상(zone fallback) : pgdat->node_zonelists[ZONELIST_NOFALLBACK]
 }
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -5629,9 +5629,9 @@ static void __build_all_zonelists(void *data)
 	 * building zonelists is fine - no need to touch other nodes.
 	 */
 	if (self && !node_online(self->node_id)) {
-		build_zonelists(self);
+		build_zonelists(self);	// hot-plug : zonelist only for self
 	} else {
-		for_each_online_node(nid) {
+		for_each_online_node(nid) { // zonelist for all nodes
 			pg_data_t *pgdat = NODE_DATA(nid);
 
 			build_zonelists(pgdat);
@@ -5690,9 +5690,9 @@ build_all_zonelists_init(void)
 void __ref build_all_zonelists(pg_data_t *pgdat)
 {
 	if (system_state == SYSTEM_BOOTING) {
-		build_all_zonelists_init();
+		build_all_zonelists_init(); 	// zonelists for all nodes
 	} else {
-		__build_all_zonelists(pgdat);
+		__build_all_zonelists(pgdat);	// zonelists only for pgdat->node_id
 		/* cpuset refresh routine should be here */
 	}
 	vm_total_pages = nr_free_pagecache_pages();

@@ -452,7 +452,7 @@ void __init smp_prepare_boot_cpu(void)
 	apply_boot_alternatives();
 
 	/* Conditionally switch to GIC PMR for interrupt masking */
-	if (system_uses_irq_prio_masking())
+	if (system_uses_irq_prio_masking()) // Check Pseudo-NMI
 		init_gic_priority_masking();
 }
 
