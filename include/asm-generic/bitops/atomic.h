@@ -50,6 +50,9 @@ static inline int test_and_set_bit(unsigned int nr, volatile unsigned long *p)
 	return !!(old & mask);
 }
 
+// #define TESTSETFLAG(Unevictable, unevictable, policy)				\
+// static __always_inline int TestSetPageUnevictable(struct page *page)	\
+// 	{ return test_and_clear_bit(PG_unevictable, &PF_HEAD(page, 1)->flags); }
 static inline int test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
 {
 	long old;
