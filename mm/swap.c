@@ -859,6 +859,7 @@ void lru_add_page_tail(struct page *page, struct page *page_tail,
 static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 				 void *arg)
 {
+	// 파스칼 네이밍은 include/linux/page-flags.h 이쪽에서 참고하자
 	enum lru_list lru;
 	int was_unevictable = TestClearPageUnevictable(page);
 

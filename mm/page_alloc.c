@@ -7550,6 +7550,7 @@ void __init page_alloc_init(void)
 {
 	int ret;
 
+	// Documentation/core-api/cpu_hotplug.rst
 	ret = cpuhp_setup_state_nocalls(CPUHP_PAGE_ALLOC_DEAD,
 					"mm/page_alloc:dead", NULL,
 					page_alloc_cpu_dead);
