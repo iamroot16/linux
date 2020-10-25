@@ -3282,7 +3282,7 @@ void cpuset_cpus_allowed_fallback(struct task_struct *tsk)
 
 void __init cpuset_init_current_mems_allowed(void)
 {
-	nodes_setall(current->mems_allowed);
+	nodes_setall(current->mems_allowed); // mems_allowed는 struct task_struct * init_task의 멤버(head.S에서 sp_el0에 저장한 주소를 읽음)
 }
 
 /**

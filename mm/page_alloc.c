@@ -4920,7 +4920,7 @@ static unsigned long nr_free_zone_pages(int offset)
 
 	/* Just pick one node, since fallback list is circular */
 	unsigned long sum = 0;
-
+	// current node's zonelist (fallback)
 	struct zonelist *zonelist = node_zonelist(numa_node_id(), GFP_KERNEL);
 
 	for_each_zone_zonelist(zone, z, zonelist, offset) {
@@ -5421,7 +5421,7 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
 
 		/* Don't want a node to appear more than once */
 		if (node_isset(n, *used_node_mask))
-			continue;
+			continue; // 이전에 best_node로 선택되었된 노드는 제외
 
 		/* Use the distance array to find the distance */
 		val = node_distance(node, n);
@@ -5520,7 +5520,7 @@ static void build_zonelists(pg_data_t *pgdat)
 		 */
 		if (node_distance(local_node, node) !=
 		    node_distance(local_node, prev_node))
-			node_load[node] = load;
+			node_load[node] = load; // find_next_best_node() 에서 가중치 계산시 사용하는 변수 업데이트 해서, 노드 거리에 따라 best_node가 분산되도록 한다
 
 		node_order[nr_nodes++] = node;
 		prev_node = node;
@@ -5703,7 +5703,7 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
 	 * made on memory-hotadd so a system can start with mobility
 	 * disabled and enable it later
 	 */
-	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES))
+	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES)) // < (512 x 6 = 3K)
 		page_group_by_mobility_disabled = 1;
 	else
 		page_group_by_mobility_disabled = 0;
