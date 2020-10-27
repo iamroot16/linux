@@ -4958,6 +4958,7 @@ EXPORT_SYMBOL_GPL(nr_free_buffer_pages);
  */
 unsigned long nr_free_pagecache_pages(void)
 {
+	// gfp_zone(GFP_HIGHUSER_MOVABLE) 은 ZONE_MOVABLE 타입 반환
 	return nr_free_zone_pages(gfp_zone(GFP_HIGHUSER_MOVABLE));
 }
 
@@ -5674,10 +5675,14 @@ build_all_zonelists_init(void)
 	 * needs the percpu allocator in order to allocate its pagesets
 	 * (a chicken-egg dilemma).
 	 */
+	// possible mask가 설정된 cpu를 순회하며 boot_pageset per_cpu_pageset
+	// 구조체 변수를 0으로 초기화 하고 구조체 멤버인 per_cpu_pages 구조체 멤버중
+	// lists 멤버를 초기화 하고 high와 batch 값을 0, 1로 초기화 한다.
 	for_each_possible_cpu(cpu)
 		setup_pageset(&per_cpu(boot_pageset, cpu), 0);
 
-	mminit_verify_zonelist();
+	mminit_verify_zonelist(); // zonlists 출력
+	// init_task의 멤버 변수 mems_allowed 비트맵을 모두 1로 설정
 	cpuset_init_current_mems_allowed();
 }
 
@@ -5695,6 +5700,8 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
 		__build_all_zonelists(pgdat);	// zonelists only for pgdat->node_id
 		/* cpuset refresh routine should be here */
 	}
+	// 만들어진 fallback 리스트의 zone 을 순회하며 movable 존 이하의 인덱스
+	// 를 가지는 모든 zone의 managed 페이지 총합을 vm_total_pages에 설정
 	vm_total_pages = nr_free_pagecache_pages();
 	/*
 	 * Disable grouping by mobility if the number of pages in the
@@ -5703,6 +5710,8 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
 	 * made on memory-hotadd so a system can start with mobility
 	 * disabled and enable it later
 	 */
+	// pagesize가 4k라면 3k * 4K = 12M, 위에서 구한 vm_total_pages가
+	// 12M 보다 작은 메모리라면 group by mobility 설정을 비활성한다.
 	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES)) // < (512 x 6 = 3K)
 		page_group_by_mobility_disabled = 1;
 	else
@@ -5989,6 +5998,7 @@ static void pageset_update(struct per_cpu_pages *pcp, unsigned long high,
 static void pageset_set_batch(struct per_cpu_pageset *p, unsigned long batch)
 {
 	pageset_update(&p->pcp, 6 * batch, max(1UL, 1 * batch));
+	// Ex. batch==0, pageset_update(&p->pcp, 0, 1);
 }
 
 static void pageset_init(struct per_cpu_pageset *p)
