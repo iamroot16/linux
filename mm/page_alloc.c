@@ -1925,7 +1925,7 @@ static inline void expand(struct zone *zone, struct page *page,
 {
 	unsigned long size = 1 << high;
 
-	while (high > low) {
+	while (high > low) { // allocated by buddy : page[0]-page[(1 << low)-1], added to free list : page[(1 << low)]-page[(1<<high)-1] 
 		area--;
 		high--;
 		size >>= 1;
