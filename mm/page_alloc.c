@@ -3522,16 +3522,16 @@ retry:
 		 * dirty-throttling and the flusher threads.
 		 */
 		if (ac->spread_dirty_pages) {
-			if (last_pgdat_dirty_limit == zone->zone_pgdat)
+			if (last_pgdat_dirty_limit == zone->zone_pgdat) // previously, exceeded dirty limit
 				continue;
 
-			if (!node_dirty_ok(zone->zone_pgdat)) {
+			if (!node_dirty_ok(zone->zone_pgdat)) { // firstly, exceeded dirty limit
 				last_pgdat_dirty_limit = zone->zone_pgdat;
 				continue;
 			}
 		}
 
-		if (no_fallback && nr_online_nodes > 1 &&
+		if (no_fallback && nr_online_nodes > 1 && // no fragement, but not a preferred zone -> retry with fragment
 		    zone != ac->preferred_zoneref->zone) {
 			int local_nid;
 
@@ -3548,7 +3548,7 @@ retry:
 		}
 
 		mark = wmark_pages(zone, alloc_flags & ALLOC_WMARK_MASK);
-		if (!zone_watermark_fast(zone, order, mark,
+		if (!zone_watermark_fast(zone, order, mark, // 대략추산한 남은 free 페이지 수와 high, low, min watermark 중 하나와 비교하여 기준 이하의 메모리 부족 상태인 경우
 				       ac_classzone_idx(ac), alloc_flags)) {
 			int ret;
 
@@ -4585,7 +4585,7 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 static inline void finalise_ac(gfp_t gfp_mask, struct alloc_context *ac)
 {
 	/* Dirty zone balancing only done in the fast path */
-	ac->spread_dirty_pages = (gfp_mask & __GFP_WRITE);
+	ac->spread_dirty_pages = (gfp_mask & __GFP_WRITE); // When GFP_WRITE set in "fastpath", enable spread dirty pages
 
 	/*
 	 * The preferred zone is used for statistics but crucially it is
