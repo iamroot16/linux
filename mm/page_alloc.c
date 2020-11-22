@@ -2201,7 +2201,7 @@ int move_freepages_block(struct zone *zone, struct page *page,
 	/* Do not cross zone boundaries */
 	if (!zone_spans_pfn(zone, start_pfn))
 		start_page = page;
-	if (!zone_spans_pfn(zone, end_pfn))
+	if (!zone_spans_pfn(zone, end_pfn)) // start_pfn ~ end_pfn이 두개 이상의 zone에 걸쳐 있는 경우
 		return 0;
 
 	return move_freepages(zone, start_page, end_page, migratetype,
@@ -2230,7 +2230,7 @@ static void change_pageblock_range(struct page *pageblock_page,
  * as fragmentation caused by those allocations polluting movable pageblocks
  * is worse than movable allocations stealing from unmovable and reclaimable
  * pageblocks.
- */
+ */ // movable pageblock로 부터 steal : 단편화 방지를 위해 page block 전체를 steal
 static bool can_steal_fallback(unsigned int order, int start_mt)
 {
 	/*
@@ -2240,10 +2240,10 @@ static bool can_steal_fallback(unsigned int order, int start_mt)
 	 * but, below check doesn't guarantee it and that is just heuristic
 	 * so could be changed anytime.
 	 */
-	if (order >= pageblock_order)
+	if (order >= pageblock_order) // whole pageblock -> stealable
 		return true;
 
-	if (order >= pageblock_order / 2 ||
+	if (order >= pageblock_order / 2 || // heuristic(order >= 4) -> could be changed anytime
 		start_mt == MIGRATE_RECLAIMABLE ||
 		start_mt == MIGRATE_UNMOVABLE ||
 		page_group_by_mobility_disabled)
@@ -2305,7 +2305,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		goto single_page;
 
 	/* Take ownership for orders >= pageblock_order */
-	if (current_order >= pageblock_order) {
+	if (current_order >= pageblock_order) { // page block 이상의 크기가 free한 경우
 		change_pageblock_range(page, current_order, start_type);
 		goto single_page;
 	}
@@ -2321,7 +2321,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 	/* We are not allowed to try stealing from the whole block */
 	if (!whole_block)
-		goto single_page;
+		goto single_page; // page block 전체를 steal 하지 않는 경우
 
 	free_pages = move_freepages_block(zone, page, start_type,
 						&movable_pages);
@@ -2349,21 +2349,21 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 	/* moving whole block can fail due to zone boundary conditions */
 	if (!free_pages)
-		goto single_page;
+		goto single_page; // whole, but not move
 
 	/*
 	 * If a sufficient number of pages in the block are either free or of
 	 * comparable migratability as our allocation, claim the whole block.
 	 */
 	if (free_pages + alike_pages >= (1 << (pageblock_order-1)) ||
-			page_group_by_mobility_disabled)
+			page_group_by_mobility_disabled) // 50%이상 free하면, page block의 migration type 변경 
 		set_pageblock_migratetype(page, start_type);
 
 	return;
 
 single_page:
 	area = &zone->free_area[current_order];
-	list_move(&page->lru, &area->free_list[start_type]);
+	list_move(&page->lru, &area->free_list[start_type]); // page -> free_list
 }
 
 /*
@@ -2371,7 +2371,7 @@ single_page:
  * If only_stealable is true, this function returns fallback_mt only if
  * we can steal other freepages all together. This would help to reduce
  * fragmentation due to mixed migratetype pages in one pageblock.
- */
+ */ // only_stealable : true -> page block 전체를 steal해서 fragmentation을 줄이도록 한다
 int find_suitable_fallback(struct free_area *area, unsigned int order,
 			int migratetype, bool only_stealable, bool *can_steal)
 {
@@ -2393,7 +2393,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 		if (can_steal_fallback(order, migratetype))
 			*can_steal = true;
 
-		if (!only_stealable)
+		if (!only_stealable) // called by __rmqueue_fallback()
 			return fallback_mt;
 
 		if (*can_steal)
@@ -2549,14 +2549,14 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 	 * i.e. orders < pageblock_order. If there are no local zones free,
 	 * the zonelists will be reiterated without ALLOC_NOFRAGMENT.
 	 */
-	if (alloc_flags & ALLOC_NOFRAGMENT)
+	if (alloc_flags & ALLOC_NOFRAGMENT) // migration type이 섞이지 않도록 요청한 경우, min_order를 페이지블럭 단위(9)로 변경
 		min_order = pageblock_order;
 
 	/*
 	 * Find the largest available free page in the other list. This roughly
 	 * approximates finding the pageblock with the most free pages, which
 	 * would be too costly to do exactly.
-	 */
+	 */ // 가장 큰 order 부터 fallback migrate 타입에 free 페이지가 있는지 찾음
 	for (current_order = MAX_ORDER - 1; current_order >= min_order;
 				--current_order) {
 		area = &(zone->free_area[current_order]);
@@ -2572,7 +2572,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 		 * largest available page, because even if the next movable
 		 * allocation falls back into a different pageblock than this
 		 * one, it won't cause permanent fragmentation.
-		 */
+		 */ // MOVABLE이 page block에서 steal이 안되면, 작은 order에서 찾는다
 		if (!can_steal && start_migratetype == MIGRATE_MOVABLE
 					&& current_order > order)
 			goto find_smallest;
@@ -2582,7 +2582,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 
 	return false;
 
-find_smallest:
+find_smallest: // 작은 order 부터 fallback migrate 타입에 free 페이지가 있는지 찾음
 	for (current_order = order; current_order < MAX_ORDER;
 							current_order++) {
 		area = &(zone->free_area[current_order]);
@@ -2598,7 +2598,7 @@ find_smallest:
 	 */
 	VM_BUG_ON(current_order == MAX_ORDER);
 
-do_steal:
+do_steal: // 찾은 fallback migrate 타입의 free 페이지를 요청한 migrate 타입의 free_list로 뺏어온 후 true를 반환한다.
 	page = list_first_entry(&area->free_list[fallback_mt],
 							struct page, lru);
 
@@ -3120,7 +3120,7 @@ static struct page *__rmqueue_pcplist(struct zone *zone, int migratetype,
 	struct page *page;
 
 	do {
-		if (list_empty(list)) {
+		if (list_empty(list)) { // pcpu cache empty -> get new pcp->batch of pages from buddy allocator 
 			pcp->count += rmqueue_bulk(zone, 0,
 					pcp->batch, list,
 					migratetype, alloc_flags);
@@ -3171,7 +3171,7 @@ struct page *rmqueue(struct zone *preferred_zone,
 	unsigned long flags;
 	struct page *page;
 
-	if (likely(order == 0)) {
+	if (likely(order == 0)) { // order 0 -> allocate by per cpu page frame cache
 		page = rmqueue_pcplist(preferred_zone, zone, order,
 				gfp_flags, migratetype, alloc_flags);
 		goto out;
@@ -3404,7 +3404,7 @@ static inline bool zone_watermark_fast(struct zone *z, unsigned int order,
 	 * the caller is !atomic then it'll uselessly search the free
 	 * list. That corner case is then slower but it is harmless.
 	 */
-	if (!order && (free_pages - cma_pages) > mark + z->lowmem_reserve[classzone_idx])
+	if (!order && (free_pages - cma_pages) > mark + z->lowmem_reserve[classzone_idx]) // fast check only for order 0 
 		return true;
 
 	return __zone_watermark_ok(z, order, mark, classzone_idx, alloc_flags,
@@ -3531,7 +3531,7 @@ retry:
 			}
 		}
 
-		if (no_fallback && nr_online_nodes > 1 && // no fragement, but not a preferred zone -> retry with fragment
+		if (no_fallback && nr_online_nodes > 1 && // no fragement(no_fallback), but not a preferred zone -> retry with fragment
 		    zone != ac->preferred_zoneref->zone) {
 			int local_nid;
 
@@ -3541,15 +3541,15 @@ retry:
 			 * than fragmentation avoidance.
 			 */
 			local_nid = zone_to_nid(ac->preferred_zoneref->zone);
-			if (zone_to_nid(zone) != local_nid) {
+			if (zone_to_nid(zone) != local_nid) { // not a local node -> retry 
 				alloc_flags &= ~ALLOC_NOFRAGMENT;
 				goto retry;
 			}
 		}
 
 		mark = wmark_pages(zone, alloc_flags & ALLOC_WMARK_MASK);
-		if (!zone_watermark_fast(zone, order, mark, // 대략추산한 남은 free 페이지 수와 high, low, min watermark 중 하나와 비교하여 기준 이하의 메모리 부족 상태인 경우
-				       ac_classzone_idx(ac), alloc_flags)) {
+		if (!zone_watermark_fast(zone, order, mark, 
+				       ac_classzone_idx(ac), alloc_flags)) { // 대략추산한 남은 free 페이지 수와 high, low, min watermark 중 하나와 비교하여 기준 이하의 메모리 부족 상태인 경우
 			int ret;
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
@@ -4560,7 +4560,7 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	ac->migratetype = gfpflags_to_migratetype(gfp_mask);
 
 	if (cpusets_enabled()) {
-		*alloc_mask |= __GFP_HARDWALL;
+		*alloc_mask |= __GFP_HARDWALL; // 현재 태스크의 cpuset이 허락하는 메모리 노드가 아닌 곳에서 할당되는 것을 허용하지 않게 한다.
 		if (!ac->nodemask)
 			ac->nodemask = &cpuset_current_mems_allowed;
 		else
@@ -4631,7 +4631,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	alloc_flags |= alloc_flags_nofragment(ac.preferred_zoneref->zone, gfp_mask);
 
 	/* First allocation attempt */
-	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
+	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac); // fast-path
 	if (likely(page))
 		goto out;
 
@@ -4642,7 +4642,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	 * memalloc_no{fs,io}_{save,restore}.
 	 */
 	alloc_mask = current_gfp_context(gfp_mask);
-	ac.spread_dirty_pages = false;
+	ac.spread_dirty_pages = false; // fail to allocate by fast-path->disable spread dirty pages->try to allocate by slow-path
 
 	/*
 	 * Restore the original nodemask if it was potentially replaced with
@@ -4651,9 +4651,9 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	if (unlikely(ac.nodemask != nodemask))
 		ac.nodemask = nodemask;
 
-	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
+	page = __alloc_pages_slowpath(alloc_mask, order, &ac); // slow-path
 
-out:
+out:	// 할당된 페이지를 반환하는데, 메모리 컨트롤 그룹의 리밋을 벗어나는 경우 할당을 포기한다.
 	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) && page &&
 	    unlikely(__memcg_kmem_charge(page, gfp_mask, order) != 0)) {
 		__free_pages(page, order);

@@ -2127,10 +2127,10 @@ struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 	 * nor system default_policy
 	 */
 	if (pol->mode == MPOL_INTERLEAVE)
-		page = alloc_page_interleave(gfp, order, interleave_nodes(pol));
+		page = alloc_page_interleave(gfp, order, interleave_nodes(pol)); // every node by interleaving
 	else
 		page = __alloc_pages_nodemask(gfp, order,
-				policy_node(gfp, pol, numa_node_id()),
+				policy_node(gfp, pol, numa_node_id()), // specific node
 				policy_nodemask(gfp, pol));
 
 	return page;
