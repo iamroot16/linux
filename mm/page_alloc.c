@@ -2014,7 +2014,7 @@ static bool check_new_pcp(struct page *page)
 	return false;
 }
 #endif /* CONFIG_DEBUG_VM */
-
+// 디버그 사용 시 할당한 페이지의 무결성을 체크한다. (hwpoison 등)
 static bool check_new_pages(struct page *page, unsigned int order)
 {
 	int i;
@@ -2305,7 +2305,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		goto single_page;
 
 	/* Take ownership for orders >= pageblock_order */
-	if (current_order >= pageblock_order) { // page block 이상의 크기가 free한 경우
+	if (current_order >= pageblock_order) { // page block 단위로 free한 경우
 		change_pageblock_range(page, current_order, start_type);
 		goto single_page;
 	}
@@ -2321,7 +2321,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 	/* We are not allowed to try stealing from the whole block */
 	if (!whole_block)
-		goto single_page; // page block 전체를 steal 하지 않는 경우
+		goto single_page;
 
 	free_pages = move_freepages_block(zone, page, start_type,
 						&movable_pages);
@@ -2330,7 +2330,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	 * For movable allocation, it's the number of movable pages which
 	 * we just obtained. For other types it's a bit more tricky.
 	 */
-	if (start_type == MIGRATE_MOVABLE) {
+	if (start_type == MIGRATE_MOVABLE) { // RECLAIMABLE, UNMOVABLE -> MOVABLE
 		alike_pages = movable_pages;
 	} else {
 		/*
@@ -2340,16 +2340,16 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		 * vice versa, be conservative since we can't distinguish the
 		 * exact migratetype of non-movable pages.
 		 */
-		if (old_block_type == MIGRATE_MOVABLE)
+		if (old_block_type == MIGRATE_MOVABLE) // MOVABLE -> RECLAIMABLE, UNMOVABLE
 			alike_pages = pageblock_nr_pages
 						- (free_pages + movable_pages);
-		else
+		else // RECLAIMABLE -> UNMOVABLE, RECLAIMABLE -> UNMOVABLE
 			alike_pages = 0;
 	}
 
 	/* moving whole block can fail due to zone boundary conditions */
 	if (!free_pages)
-		goto single_page; // whole, but not move
+		goto single_page;
 
 	/*
 	 * If a sufficient number of pages in the block are either free or of
@@ -2361,9 +2361,9 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 	return;
 
-single_page:
+single_page: // page block 단위 이동 또는 1 page 이동
 	area = &zone->free_area[current_order];
-	list_move(&page->lru, &area->free_list[start_type]); // page -> free_list
+	list_move(&page->lru, &area->free_list[start_type]);
 }
 
 /*
@@ -2427,7 +2427,7 @@ static void reserve_highatomic_pageblock(struct page *page, struct zone *zone,
 	if (zone->nr_reserved_highatomic >= max_managed)
 		goto out_unlock;
 
-	/* Yoink! */
+	/* Yoink! */ // 훔치다
 	mt = get_pageblock_migratetype(page);
 	if (!is_migrate_highatomic(mt) && !is_migrate_isolate(mt)
 	    && !is_migrate_cma(mt)) {
@@ -3593,7 +3593,7 @@ try_this_zone:
 		page = rmqueue(ac->preferred_zoneref->zone, zone, order,
 				gfp_mask, alloc_flags, ac->migratetype);
 		if (page) {
-			prep_new_page(page, order, gfp_mask, alloc_flags);
+			prep_new_page(page, order, gfp_mask, alloc_flags); // 새 페이지 구조체에 대한 준비를 수행
 
 			/*
 			 * If this is a high-order atomic allocation then check
