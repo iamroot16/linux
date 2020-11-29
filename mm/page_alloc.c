@@ -1984,7 +1984,7 @@ static inline int check_new_page(struct page *page)
 				PAGE_FLAGS_CHECK_AT_PREP|__PG_HWPOISON)))
 		return 0;
 
-	check_new_page_bad(page);
+	check_new_page_bad(page); // bad page 를 표시한다
 	return 1;
 }
 
@@ -2014,7 +2014,7 @@ static bool check_new_pcp(struct page *page)
 	return false;
 }
 #endif /* CONFIG_DEBUG_VM */
-// 디버그 사용 시 할당한 페이지의 무결성을 체크한다. (hwpoison 등)
+// 할당한 새 페이지가 문제가 없는지 체크한다. (hwpoison 등)
 static bool check_new_pages(struct page *page, unsigned int order)
 {
 	int i;
@@ -2230,7 +2230,7 @@ static void change_pageblock_range(struct page *pageblock_page,
  * as fragmentation caused by those allocations polluting movable pageblocks
  * is worse than movable allocations stealing from unmovable and reclaimable
  * pageblocks.
- */ // movable pageblock로 부터 steal : 단편화 방지를 위해 page block 전체를 steal
+ */
 static bool can_steal_fallback(unsigned int order, int start_mt)
 {
 	/*
@@ -2343,7 +2343,7 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 		if (old_block_type == MIGRATE_MOVABLE) // MOVABLE -> RECLAIMABLE, UNMOVABLE
 			alike_pages = pageblock_nr_pages
 						- (free_pages + movable_pages);
-		else // RECLAIMABLE -> UNMOVABLE, RECLAIMABLE -> UNMOVABLE
+		else // RECLAIMABLE -> UNMOVABLE, UNMOVABLE -> RECLAIMABLE
 			alike_pages = 0;
 	}
 
@@ -2572,7 +2572,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 		 * largest available page, because even if the next movable
 		 * allocation falls back into a different pageblock than this
 		 * one, it won't cause permanent fragmentation.
-		 */ // MOVABLE이 page block에서 steal이 안되면, 작은 order에서 찾는다
+		 */ // 다른 migration type의 free page가 있으나, steal이 안되면(current_order < pageblock_order / 2), 작은 order에서 찾는다
 		if (!can_steal && start_migratetype == MIGRATE_MOVABLE
 					&& current_order > order)
 			goto find_smallest;
