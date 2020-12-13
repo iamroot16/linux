@@ -1977,14 +1977,14 @@ static void check_new_page_bad(struct page *page)
 
 /*
  * This page is about to be returned from the page allocator
- */
+ */ // PAGE_FLAGS_CHECK_AT_PREP(a kernel bug or struct page corruption), __PG_HWPOISON(hardware poisoned page)
 static inline int check_new_page(struct page *page)
 {
 	if (likely(page_expected_state(page,
 				PAGE_FLAGS_CHECK_AT_PREP|__PG_HWPOISON)))
 		return 0;
 
-	check_new_page_bad(page); // bad page 를 표시한다
+	check_new_page_bad(page);
 	return 1;
 }
 
@@ -2014,7 +2014,7 @@ static bool check_new_pcp(struct page *page)
 	return false;
 }
 #endif /* CONFIG_DEBUG_VM */
-// 할당한 새 페이지가 문제가 없는지 체크한다. (hwpoison 등)
+// 할당한 새 페이지가 문제가 없는지 체크하고, 문제가 있으면 다시 사용하지 않도록 기록하고 덤프메시지 출력
 static bool check_new_pages(struct page *page, unsigned int order)
 {
 	int i;
@@ -3308,7 +3308,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	const bool alloc_harder = (alloc_flags & (ALLOC_HARDER|ALLOC_OOM));
 
 	/* free_pages may go negative - that's OK */
-	free_pages -= (1 << order) - 1;
+	free_pages -= (1 << order) - 1; // by subtracting 1, 'free_pages > something' except for '=' becomes 'return true' condition
 
 	if (alloc_flags & ALLOC_HIGH)
 		min -= min / 2;
@@ -3593,7 +3593,7 @@ try_this_zone:
 		page = rmqueue(ac->preferred_zoneref->zone, zone, order,
 				gfp_mask, alloc_flags, ac->migratetype);
 		if (page) {
-			prep_new_page(page, order, gfp_mask, alloc_flags); // 새 페이지 구조체에 대한 준비를 수행
+			prep_new_page(page, order, gfp_mask, alloc_flags);
 
 			/*
 			 * If this is a high-order atomic allocation then check
@@ -4354,7 +4354,7 @@ retry_cpuset:
 	 * The adjusted alloc_flags might result in immediate success, so try
 	 * that first
 	 */
-	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
+	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac); // retry fast-path with changed alloc_flags
 	if (page)
 		goto got_pg;
 
@@ -4642,7 +4642,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	 * memalloc_no{fs,io}_{save,restore}.
 	 */
 	alloc_mask = current_gfp_context(gfp_mask);
-	ac.spread_dirty_pages = false; // fail to allocate by fast-path->disable spread dirty pages->try to allocate by slow-path
+	ac.spread_dirty_pages = false;
 
 	/*
 	 * Restore the original nodemask if it was potentially replaced with

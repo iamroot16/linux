@@ -1964,7 +1964,7 @@ static enum compact_result __compaction_suitable(struct zone *zone, int order,
 	/*
 	 * If watermarks for high-order allocation are already met, there
 	 * should be no need for compaction at all.
-	 */
+	 */ // 워터마크 이상의 free 페이지가 이미 확보된 경우 compaction이 필요 없는 상황
 	if (zone_watermark_ok(zone, order, watermark, classzone_idx,
 								alloc_flags))
 		return COMPACT_SUCCESS;
@@ -1986,7 +1986,7 @@ static enum compact_result __compaction_suitable(struct zone *zone, int order,
 	watermark = (order > PAGE_ALLOC_COSTLY_ORDER) ?
 				low_wmark_pages(zone) : min_wmark_pages(zone);
 	watermark += compact_gap(order);
-	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx,
+	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx, // compaction이 완료된 상황을 가정한 상황으로 비교
 						ALLOC_CMA, wmark_target))
 		return COMPACT_SKIPPED;
 

@@ -320,11 +320,11 @@ void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 	long x;
 	long t;
 
-	x = delta + __this_cpu_read(*p);
+	x = delta + __this_cpu_read(*p); // 변화량과 가지고 있던 한 cpu의 per-cpu의 카운터값
 
 	t = __this_cpu_read(pcp->stat_threshold);
 
-	if (unlikely(x > t || x < -t)) {
+	if (unlikely(x > t || x < -t)) { // per-cpu (SMP) 성능 저하를 막기위해 threshold 를 초과한 경우만 cpu 공통 존카운터에 더함
 		zone_page_state_add(x, zone, item);
 		x = 0;
 	}
