@@ -332,7 +332,7 @@ static void __reset_isolation_suitable(struct zone *zone)
 	 * for PageLRU while target looks for PageBuddy. When the scanner
 	 * is found, both PageBuddy and PageLRU are checked as the pageblock
 	 * is suitable as both source and target.
-	 */
+	 */ // migrate_pfn : update once on start @ zone ->center, free_pfn : update once on end @ zone ->center
 	for (; migrate_pfn < free_pfn; migrate_pfn += pageblock_nr_pages,
 					free_pfn -= pageblock_nr_pages) {
 		cond_resched();
@@ -358,7 +358,7 @@ static void __reset_isolation_suitable(struct zone *zone)
 	}
 
 	/* Leave no distance if no suitable block was reset */
-	if (reset_migrate >= reset_free) {
+	if (reset_migrate >= reset_free) { // reset_migrate or reset_free does NOT set during above for-loop
 		zone->compact_cached_migrate_pfn[0] = migrate_pfn;
 		zone->compact_cached_migrate_pfn[1] = migrate_pfn;
 		zone->compact_cached_free_pfn = free_pfn;
@@ -1986,7 +1986,7 @@ static enum compact_result __compaction_suitable(struct zone *zone, int order,
 	watermark = (order > PAGE_ALLOC_COSTLY_ORDER) ?
 				low_wmark_pages(zone) : min_wmark_pages(zone);
 	watermark += compact_gap(order);
-	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx, // compaction이 완료된 상황을 가정한 상황으로 비교
+	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx, // compaction이 완료를 가정한 상황으로 비교
 						ALLOC_CMA, wmark_target))
 		return COMPACT_SKIPPED;
 
