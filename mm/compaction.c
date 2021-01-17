@@ -1664,7 +1664,7 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
 		distance >>= 2;
 	high_pfn = pageblock_start_pfn(cc->migrate_pfn + distance);
 
-	for (order = cc->order - 1;
+	for (order = cc->order - 1; // cc->order를 만족하는 여유공간은 없으므로, 하나 작은 오더부터 내림차순으로 찾음
 	     order >= PAGE_ALLOC_COSTLY_ORDER && pfn == cc->migrate_pfn && nr_scanned < limit;
 	     order--) {
 		struct free_area *area = &cc->zone->free_area[order];
@@ -1682,7 +1682,7 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
 
 			nr_scanned++;
 			free_pfn = page_to_pfn(freepage);
-			if (free_pfn < high_pfn) {
+			if (free_pfn < high_pfn) { // high_pfn을 마이그레이션 하면 마이그레이션 후, 근처의 높은 오더의 여유공간이 생길 수 있는 확률이 높다
 				/*
 				 * Avoid if skipped recently. Ideally it would
 				 * move to the tail but even safe iteration of
@@ -1697,16 +1697,16 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
 				}
 
 				/* Reorder to so a future search skips recent pages */
-				move_freelist_tail(freelist, freepage);
+				move_freelist_tail(freelist, freepage); // 다음에 list_for_each_entry로 순회시 freepage가 뒤쪽에 있도록 옮긴다
 
 				update_fast_start_pfn(cc, free_pfn);
-				pfn = pageblock_start_pfn(free_pfn);
+				pfn = pageblock_start_pfn(free_pfn); // 마이그레이션할 페이지를 찾기 시작할 위치
 				cc->fast_search_fail = 0;
-				set_pageblock_skip(freepage);
+				set_pageblock_skip(freepage); // 다음에 이함수를 사용시, 동일한 freepage를 찾지 않도록 함
 				break;
 			}
 
-			if (nr_scanned >= limit) {
+			if (nr_scanned >= limit) { // 실패횟수 제한을 초과
 				cc->fast_search_fail++;
 				move_freelist_tail(freelist, freepage);
 				break;
@@ -1759,7 +1759,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	 * the isolation_suitable check below, check whether the fast
 	 * search was successful.
 	 */
-	fast_find_block = low_pfn != cc->migrate_pfn && !cc->fast_search_fail;
+	fast_find_block = low_pfn != cc->migrate_pfn && !cc->fast_search_fail; //fast_find_migratebloc에서 low_pfn 찾으면 true
 
 	/* Only scan within a pageblock boundary */
 	block_end_pfn = pageblock_end_pfn(low_pfn);
@@ -1769,7 +1769,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	 * Do not cross the free scanner.
 	 */
 	for (; block_end_pfn <= cc->free_pfn;
-			fast_find_block = false,
+			fast_find_block = false, // fast_find_block이 true일 수 있는 경우는 처음 순회할 경우
 			low_pfn = block_end_pfn,
 			block_start_pfn = block_end_pfn,
 			block_end_pfn += pageblock_nr_pages) {
@@ -1795,7 +1795,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		 * not scan the same block.
 		 */
 		if (IS_ALIGNED(low_pfn, pageblock_nr_pages) &&
-		    !fast_find_block && !isolation_suitable(cc, page))
+		    !fast_find_block && !isolation_suitable(cc, page)) // fast_find_block이 true이면, isolation_suitable()호출 안됨
 			continue;
 
 		/*
