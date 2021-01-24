@@ -414,10 +414,10 @@ static void update_cached_migrate(struct compact_control *cc, unsigned long pfn)
 		return;
 
 	if (pfn > zone->compact_cached_migrate_pfn[0])
-		zone->compact_cached_migrate_pfn[0] = pfn;
+		zone->compact_cached_migrate_pfn[0] = pfn; // ASYNC
 	if (cc->mode != MIGRATE_ASYNC &&
 	    pfn > zone->compact_cached_migrate_pfn[1])
-		zone->compact_cached_migrate_pfn[1] = pfn;
+		zone->compact_cached_migrate_pfn[1] = pfn; // SYNC
 }
 
 /*
@@ -802,9 +802,9 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		if (cc->mode == MIGRATE_ASYNC)
 			return 0;
 
-		congestion_wait(BLK_RW_ASYNC, HZ/10);
+		congestion_wait(BLK_RW_ASYNC, HZ/10); // 100ms 지연
 
-		if (fatal_signal_pending(current))
+		if (fatal_signal_pending(current)) // SIGKILL 처리
 			return 0;
 	}
 
@@ -818,7 +818,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 	/* Time to isolate some pages for migration */
 	for (; low_pfn < end_pfn; low_pfn++) {
 
-		if (skip_on_failure && low_pfn >= next_skip_pfn) {
+		if (skip_on_failure && low_pfn >= next_skip_pfn) { // skip_on_failure : order 단위로 페이지를 검색하여 isolation이 하나라도 있으면 break
 			/*
 			 * We have isolated all migration candidates in the
 			 * previous order-aligned block, and did not skip it due
@@ -876,7 +876,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		 * the worst thing that can happen is that we skip some
 		 * potential isolation targets.
 		 */
-		if (PageBuddy(page)) {
+		if (PageBuddy(page)) { // 버디의 free page는 order만큼 skip
 			unsigned long freepage_order = page_order_unsafe(page);
 
 			/*
@@ -896,7 +896,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		 * racy, but we can consider only valid values and the only
 		 * danger is skipping too much.
 		 */
-		if (PageCompound(page)) {
+		if (PageCompound(page)) { // compound(slab, hugetlbfs, thp) 페이지는 compaction 효과가 없으므로 isolate_fail로 이동
 			const unsigned int order = compound_order(page);
 
 			if (likely(order < MAX_ORDER))
@@ -916,13 +916,13 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			 */
 			if (unlikely(__PageMovable(page)) &&
 					!PageIsolated(page)) {
-				if (locked) {
+				if (locked) { //락이 있는 경우 해제
 					spin_unlock_irqrestore(&pgdat->lru_lock,
 									flags);
 					locked = false;
 				}
 
-				if (!isolate_movable_page(page, isolate_mode))
+				if (!isolate_movable_page(page, isolate_mode)) // non-LRU movable page는 드라이버에서 isolation
 					goto isolate_success;
 			}
 
@@ -946,7 +946,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			goto isolate_fail;
 
 		/* If we already hold the lock, we can skip some rechecking */
-		if (!locked) {
+		if (!locked) { // 락이 없는 경우, 페이지가 변경될 수 있으므로 재확인
 			locked = compact_lock_irqsave(&pgdat->lru_lock,
 								&flags, cc);
 
@@ -982,7 +982,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 		/* Successfully isolated */
 		del_page_from_lru_list(page, lruvec, page_lru(page));
-		inc_node_page_state(page,
+		inc_node_page_state(page, // NR_ISOLATED_ANON 또는 NR_ISOLATED_FILE를 증가
 				NR_ISOLATED_ANON + page_is_file_cache(page));
 
 isolate_success:
@@ -1767,7 +1767,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	/*
 	 * Iterate over whole pageblocks until we find the first suitable.
 	 * Do not cross the free scanner.
-	 */
+	 */ // 페이지블럭 단위로 순회하면서 조건을 검사하여 isolation을 시도하고 성공하면 break
 	for (; block_end_pfn <= cc->free_pfn;
 			fast_find_block = false, // fast_find_block이 true일 수 있는 경우는 처음 순회할 경우
 			low_pfn = block_end_pfn,
@@ -1807,7 +1807,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		 * and the compaction scanners fail to meet.
 		 */
 		if (!suitable_migration_source(cc, page)) {
-			update_cached_migrate(cc, block_end_pfn);
+			update_cached_migrate(cc, block_end_pfn); // compound page이면 스킵하도록 캐시를 갱신
 			continue;
 		}
 
@@ -1986,7 +1986,7 @@ static enum compact_result __compaction_suitable(struct zone *zone, int order,
 	watermark = (order > PAGE_ALLOC_COSTLY_ORDER) ?
 				low_wmark_pages(zone) : min_wmark_pages(zone);
 	watermark += compact_gap(order);
-	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx, // compaction이 완료를 가정한 상황으로 비교
+	if (!__zone_watermark_ok(zone, 0, watermark, classzone_idx, // compaction 완료를 가정한 상황으로 비교
 						ALLOC_CMA, wmark_target))
 		return COMPACT_SKIPPED;
 

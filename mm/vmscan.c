@@ -1549,7 +1549,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 	 */
 	if (mode & ISOLATE_ASYNC_MIGRATE) {
 		/* All the caller can do on PageWriteback is block */
-		if (PageWriteback(page))
+		if (PageWriteback(page)) // 캐시의 내용을 메모리에 쓰고 있으면, ISOLATE 안함
 			return ret;
 
 		if (PageDirty(page)) {
@@ -1567,7 +1567,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 			 */
 			if (!trylock_page(page))
 				return ret;
-
+			// migratepage 핸들러 함수가 등록되어 있지 않은 매핑 페이지인 경우 중단
 			mapping = page_mapping(page);
 			migrate_dirty = !mapping || mapping->a_ops->migratepage;
 			unlock_page(page);
@@ -1579,7 +1579,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 	if ((mode & ISOLATE_UNMAPPED) && page_mapped(page))
 		return ret;
 
-	if (likely(get_page_unless_zero(page))) {
+	if (likely(get_page_unless_zero(page))) { // 사용중인 페이지라면(refcount가 1 이상)
 		/*
 		 * Be careful not to clear PageLRU until after we're
 		 * sure the page is not being freed elsewhere -- the

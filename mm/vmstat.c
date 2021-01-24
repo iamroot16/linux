@@ -565,9 +565,9 @@ static inline void mod_node_state(struct pglist_data *pgdat,
 			z = n + os;
 			n = -os;
 		}
-	} while (this_cpu_cmpxchg(*p, o, n) != o);
+	} while (this_cpu_cmpxchg(*p, o, n) != o); // 이전에 읽은 값(o)와 다르면, 다시 시도
 
-	if (z)
+	if (z) // threshold를 넘은 경우
 		node_page_state_add(z, pgdat, item);
 }
 

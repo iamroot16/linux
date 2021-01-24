@@ -80,7 +80,7 @@ int migrate_prep_local(void)
 
 	return 0;
 }
-
+// non-LRU movable page는 migartion type-movable와 다르며, 드라이버의 isolate_page() 호출
 int isolate_movable_page(struct page *page, isolate_mode_t mode)
 {
 	struct address_space *mapping;
@@ -124,7 +124,7 @@ int isolate_movable_page(struct page *page, isolate_mode_t mode)
 	mapping = page_mapping(page);
 	VM_BUG_ON_PAGE(!mapping, page);
 
-	if (!mapping->a_ops->isolate_page(page, mode))
+	if (!mapping->a_ops->isolate_page(page, mode)) // 디바이스드라이버에 구현된 함수를 호출
 		goto out_no_isolated;
 
 	/* Driver shouldn't use PG_isolated bit of page->flags */
