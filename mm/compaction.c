@@ -818,14 +818,14 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 	/* Time to isolate some pages for migration */
 	for (; low_pfn < end_pfn; low_pfn++) {
 
-		if (skip_on_failure && low_pfn >= next_skip_pfn) { // skip_on_failure : order 단위로 페이지를 검색하여 isolation이 하나라도 있으면 break
+		if (skip_on_failure && low_pfn >= next_skip_pfn) { // skip_on_failure : 요청한 order 단위로 페이지를 검색하여 isolate_success이 하나라도 있으면 break
 			/*
 			 * We have isolated all migration candidates in the
 			 * previous order-aligned block, and did not skip it due
 			 * to failure. We should migrate the pages now and
 			 * hopefully succeed compaction.
 			 */
-			if (nr_isolated)
+			if (nr_isolated) // :isolate_fail후 -> :isolate_success로 하나 이상의 페이지를 isolation한 경우
 				break;
 
 			/*
@@ -982,7 +982,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 		/* Successfully isolated */
 		del_page_from_lru_list(page, lruvec, page_lru(page));
-		inc_node_page_state(page, // NR_ISOLATED_ANON 또는 NR_ISOLATED_FILE를 증가
+		inc_node_page_state(page, // node_state를 NR_ISOLATED_ANON 또는 NR_ISOLATED_FILE로 변경
 				NR_ISOLATED_ANON + page_is_file_cache(page));
 
 isolate_success:
@@ -1050,10 +1050,10 @@ isolate_abort:
 	 * failure reason may persist. The block is marked for skipping if
 	 * there were no pages isolated in the block or if the block is
 	 * rescanned twice in a row.
-	 */
+	 */ // 페이지 블럭의 끝까지 처리하였고 처리된 isolated 페이지가 없는 경우 
 	if (low_pfn == end_pfn && (!nr_isolated || cc->rescan)) {
 		if (valid_page && !skip_updated)
-			set_pageblock_skip(valid_page);
+			set_pageblock_skip(valid_page); // valid_page에 해당하는 페이지 블럭의 migrate skip 비트를 1로 설정하여 다음 스캔에서 skip
 		update_cached_migrate(cc, low_pfn);
 	}
 
@@ -1126,7 +1126,7 @@ static bool suitable_migration_source(struct compact_control *cc,
 
 	if ((cc->mode != MIGRATE_ASYNC) || !cc->direct_compaction)
 		return true;
-
+	// async or direct-compaction -> 가볍고 빠르게 진행하기 위해 해당 블럭 migrate 타입이 요청한 migrate 타입과 동일할 경우에만 true
 	block_mt = get_pageblock_migratetype(page);
 
 	if (cc->migratetype == MIGRATE_MOVABLE)
@@ -1795,7 +1795,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		 * not scan the same block.
 		 */
 		if (IS_ALIGNED(low_pfn, pageblock_nr_pages) &&
-		    !fast_find_block && !isolation_suitable(cc, page)) // fast_find_block이 true이면, isolation_suitable()호출 안됨
+		    !fast_find_block && !isolation_suitable(cc, page)) // fast_find_block이 true이면, isolation_suitable(page block skip 확인)호출 안됨
 			continue;
 
 		/*
@@ -1815,14 +1815,14 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		low_pfn = isolate_migratepages_block(cc, low_pfn,
 						block_end_pfn, isolate_mode);
 
-		if (!low_pfn)
+		if (!low_pfn) // too_many_isolated && (MIGRATE_ASYNC || SIGKILL) : No isolated pages
 			return ISOLATE_ABORT;
 
 		/*
 		 * Either we isolated something and proceed with migration. Or
 		 * we failed and compact_zone should decide if we should
 		 * continue or not.
-		 */
+		 */ // low_pfn != 0 이면 다음 페이지 블럭을 처리 안함
 		break;
 	}
 
@@ -2087,7 +2087,7 @@ compact_zone(struct compact_control *cc, struct capture_control *capc)
 	 * Clear pageblock skip if there were failures recently and compaction
 	 * is about to be retried after being deferred.
 	 */
-	if (compaction_restarting(cc->zone, cc->order))
+	if (compaction_restarting(cc->zone, cc->order)) // zone : each zone, order : requested
 		__reset_isolation_suitable(cc->zone);
 
 	/*
@@ -2100,7 +2100,7 @@ compact_zone(struct compact_control *cc, struct capture_control *capc)
 	if (cc->whole_zone) {
 		cc->migrate_pfn = start_pfn;
 		cc->free_pfn = pageblock_start_pfn(end_pfn - 1);
-	} else {
+	} else { // 지난 compaction에 연이어 동작해야 하는 경우
 		cc->migrate_pfn = cc->zone->compact_cached_migrate_pfn[sync];
 		cc->free_pfn = cc->zone->compact_cached_free_pfn;
 		if (cc->free_pfn < start_pfn || cc->free_pfn >= end_pfn) {
@@ -2150,7 +2150,7 @@ compact_zone(struct compact_control *cc, struct capture_control *capc)
 		cc->rescan = false;
 		if (pageblock_start_pfn(last_migrated_pfn) ==
 		    pageblock_start_pfn(start_pfn)) {
-			cc->rescan = true;
+			cc->rescan = true; // isolation skip시 참조하는 변수
 		}
 
 		switch (isolate_migratepages(cc->zone, cc)) {
@@ -2161,7 +2161,7 @@ compact_zone(struct compact_control *cc, struct capture_control *capc)
 			last_migrated_pfn = 0;
 			goto out;
 		case ISOLATE_NONE:
-			if (update_cached) {
+			if (update_cached) { // async
 				cc->zone->compact_cached_migrate_pfn[1] =
 					cc->zone->compact_cached_migrate_pfn[0];
 			}
