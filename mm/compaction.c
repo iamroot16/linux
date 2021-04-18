@@ -552,7 +552,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 	cursor = pfn_to_page(blockpfn);
 
 	/* Isolate free pages. */
-	for (; blockpfn < end_pfn; blockpfn += stride, cursor += stride) {
+	for (; blockpfn < end_pfn; blockpfn += stride, cursor += stride) { // stride단위로 페이지를 순회
 		int isolated;
 		struct page *page = cursor;
 
@@ -576,7 +576,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 		 * The check is racy, but we can consider only valid values
 		 * and the only danger is skipping too much.
 		 */
-		if (PageCompound(page)) {
+		if (PageCompound(page)) { // compound(slab, hugetlbfs, thp, balloon) 페이지는 compaction 효과가 없으므로 isolate_fail로 이동
 			const unsigned int order = compound_order(page);
 
 			if (likely(order < MAX_ORDER)) {
@@ -596,7 +596,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 		 * so it is correct to skip the suitable migration target
 		 * recheck as well.
 		 */
-		if (!locked) {
+		if (!locked) { // 락이 없는 경우, 페이지가 변경될 수 있으므로 재확인
 			locked = compact_lock_irqsave(&cc->zone->lock,
 								&flags, cc);
 
@@ -1181,7 +1181,7 @@ static inline bool compact_scanners_met(struct compact_control *cc)
  * Used when scanning for a suitable migration target which scans freelists
  * in reverse. Reorders the list such as the unscanned pages are scanned
  * first on the next iteration of the free scanner
- */
+ */ // a-page-b -> b-page-a
 static void
 move_freelist_head(struct list_head *freelist, struct page *freepage)
 {
@@ -1214,7 +1214,7 @@ move_freelist_tail(struct list_head *freelist, struct page *freepage)
 
 static void
 fast_isolate_around(struct compact_control *cc, unsigned long pfn, unsigned long nr_isolated)
-{
+{ // pfn 앞/뒤의 nr_isolated를 제외한 free page들을 isolation
 	unsigned long start_pfn, end_pfn;
 	struct page *page = pfn_to_page(pfn);
 
@@ -1230,14 +1230,14 @@ fast_isolate_around(struct compact_control *cc, unsigned long pfn, unsigned long
 	start_pfn = pageblock_start_pfn(pfn);
 	end_pfn = min(start_pfn + pageblock_nr_pages, zone_end_pfn(cc->zone));
 
-	/* Scan before */
+	/* Scan before */ // start_pfn ~ pfn
 	if (start_pfn != pfn) {
 		isolate_freepages_block(cc, &start_pfn, pfn, &cc->freepages, 1, false);
 		if (cc->nr_freepages >= cc->nr_migratepages)
 			return;
 	}
 
-	/* Scan after */
+	/* Scan after */ // (pfn + nr_isolated) ~ end_pfn
 	start_pfn = pfn + nr_isolated;
 	if (start_pfn != end_pfn)
 		isolate_freepages_block(cc, &start_pfn, end_pfn, &cc->freepages, 1, false);
@@ -1267,7 +1267,7 @@ static int next_search_order(struct compact_control *cc, int order)
 
 static unsigned long
 fast_isolate_freepages(struct compact_control *cc)
-{
+{ // PFN을 모두 찾지 않고, freelist->freepages의 뒤쪽부터 순회하며서 free_pfn에 인접한 freepage를 찾아 isolation한다
 	unsigned int limit = min(1U, freelist_scan_limit(cc) >> 1);
 	unsigned int nr_scanned = 0;
 	unsigned long low_pfn, min_pfn, high_pfn = 0, highest = 0;
@@ -1293,7 +1293,7 @@ fast_isolate_freepages(struct compact_control *cc)
 	/*
 	 * Preferred point is in the top quarter of the scan space but take
 	 * a pfn from the top half if the search is problematic.
-	 */
+	 */ // migrate_pfn----min_pfn--low_pfn--free_pfn, if distance is 8 page blocks (--------)
 	distance = (cc->free_pfn - cc->migrate_pfn);
 	low_pfn = pageblock_start_pfn(cc->free_pfn - (distance >> 2));
 	min_pfn = pageblock_start_pfn(cc->free_pfn - (distance >> 1));
@@ -1309,7 +1309,7 @@ fast_isolate_freepages(struct compact_control *cc)
 
 	for (order = cc->search_order;
 	     !page && order >= 0;
-	     order = next_search_order(cc, order)) {
+	     order = next_search_order(cc, order)) { // decrease and wrapped around cc->order until cc->search_order
 		struct free_area *area = &cc->zone->free_area[order];
 		struct list_head *freelist;
 		struct page *freepage;
@@ -1321,7 +1321,7 @@ fast_isolate_freepages(struct compact_control *cc)
 
 		spin_lock_irqsave(&cc->zone->lock, flags);
 		freelist = &area->free_list[MIGRATE_MOVABLE];
-		list_for_each_entry_reverse(freepage, freelist, lru) {
+		list_for_each_entry_reverse(freepage, freelist, lru) { // freepage를 backward부터 순회(cold page 우선, 버디시스템의 freepage 리스트 순서가 PFN의 순서는 아님)
 			unsigned long pfn;
 
 			order_scanned++;
@@ -1331,7 +1331,7 @@ fast_isolate_freepages(struct compact_control *cc)
 			if (pfn >= highest)
 				highest = pageblock_start_pfn(pfn);
 
-			if (pfn >= low_pfn) {
+			if (pfn >= low_pfn) { // 제일 좋은 경우 : migrate_pfn----min_pfn--low_pfn-X-free_pfn
 				cc->fast_search_fail = 0;
 				cc->search_order = order;
 				page = freepage;
@@ -1350,7 +1350,7 @@ fast_isolate_freepages(struct compact_control *cc)
 		}
 
 		/* Use a minimum pfn if a preferred one was not found */
-		if (!page && high_pfn) {
+		if (!page && high_pfn) { // high_pfn : highest와 달리, 순회 중 min_pfn이상이면서 큰 pfn
 			page = pfn_to_page(high_pfn);
 
 			/* Update freepage for the list reorder below */
@@ -1358,11 +1358,11 @@ fast_isolate_freepages(struct compact_control *cc)
 		}
 
 		/* Reorder to so a future search skips recent pages */
-		move_freelist_head(freelist, freepage);
+		move_freelist_head(freelist, freepage); // 다음에 동일한 freepage를 찾아보지 않도록, head에 리스트를 잘라서 붙임
 
 		/* Isolate the page if available */
 		if (page) {
-			if (__isolate_free_page(page, order)) {
+			if (__isolate_free_page(page, order)) { // 찾은 pages를 lru에서 제거하여 isolation
 				set_page_private(page, order);
 				nr_isolated = 1 << order;
 				cc->nr_freepages += nr_isolated;
@@ -1385,7 +1385,7 @@ fast_isolate_freepages(struct compact_control *cc)
 			limit = min(1U, limit >> 1);
 	}
 
-	if (!page) {
+	if (!page) { // freepage isolate 실패시, 탐색할 cc->free_pfn 위치를 설정
 		cc->fast_search_fail++;
 		if (scan_start) {
 			/*
@@ -1393,13 +1393,13 @@ fast_isolate_freepages(struct compact_control *cc)
 			 * not found, be pessemistic for direct compaction
 			 * and use the min mark.
 			 */
-			if (highest) {
+			if (highest) { // highest : 하한없이 순회 중 가장 큰 pfn이 속한 페이지블럭의 시작 페이지
 				page = pfn_to_page(highest);
 				cc->free_pfn = highest;
 			} else {
 				if (cc->direct_compaction) {
 					page = pfn_to_page(min_pfn);
-					cc->free_pfn = min_pfn;
+					cc->free_pfn = min_pfn; // skip all failed pfns from min_pfn to free_pfn
 				}
 			}
 		}
@@ -1411,7 +1411,7 @@ fast_isolate_freepages(struct compact_control *cc)
 	}
 
 	cc->total_free_scanned += nr_scanned;
-	if (!page)
+	if (!page) // isolation 실패시
 		return cc->free_pfn;
 
 	low_pfn = page_to_pfn(page);
@@ -1461,7 +1461,7 @@ static void isolate_freepages(struct compact_control *cc)
 	 * Isolate free pages until enough are available to migrate the
 	 * pages on cc->migratepages. We stop searching if the migrate
 	 * and free page scanners meet or enough free pages are isolated.
-	 */
+	 */ // 페이지블럭 단위로 앞쪽으로 순회하면서 조건을 검사하여 isolation 시도하고 성공하면 break
 	for (; block_start_pfn >= low_pfn;
 				block_end_pfn = block_start_pfn,
 				block_start_pfn -= pageblock_nr_pages,
@@ -1497,7 +1497,7 @@ static void isolate_freepages(struct compact_control *cc)
 			update_pageblock_skip(cc, page, block_start_pfn);
 
 		/* Are enough freepages isolated? */
-		if (cc->nr_freepages >= cc->nr_migratepages) {
+		if (cc->nr_freepages >= cc->nr_migratepages) { // migrate_pfn이 찾은 페이지를 옮길 수 있는 충분한 양의 페이지가 isolation된 경우
 			if (isolate_start_pfn >= block_end_pfn) {
 				/*
 				 * Restart at previous pageblock if more
@@ -1546,7 +1546,7 @@ static struct page *compaction_alloc(struct page *migratepage,
 	struct compact_control *cc = (struct compact_control *)data;
 	struct page *freepage;
 
-	if (list_empty(&cc->freepages)) {
+	if (list_empty(&cc->freepages)) { // 리스트에 free 페이지가 없는 경우, free_pfn 스캐너로 isolation하여 list를 채운다
 		isolate_freepages(cc);
 
 		if (list_empty(&cc->freepages))
@@ -1767,7 +1767,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	/*
 	 * Iterate over whole pageblocks until we find the first suitable.
 	 * Do not cross the free scanner.
-	 */ // 페이지블럭 단위로 순회하면서 조건을 검사하여 isolation을 시도하고 성공하면 break
+	 */ // 페이지블럭 단위로 뒤쪽으로 순회하면서 조건을 검사하여 isolation을 시도하고 성공하면 break
 	for (; block_end_pfn <= cc->free_pfn;
 			fast_find_block = false, // fast_find_block이 true일 수 있는 경우는 처음 순회할 경우
 			low_pfn = block_end_pfn,

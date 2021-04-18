@@ -1153,7 +1153,7 @@ out:
 /*
  * gcc 4.7 and 4.8 on arm get an ICEs when inlining unmap_and_move().  Work
  * around it.
- */
+ */ // ICE : Internal Compiler Error
 #if defined(CONFIG_ARM) && \
 	defined(GCC_VERSION) && GCC_VERSION < 40900 && GCC_VERSION >= 40700
 #define ICE_noinline noinline
@@ -1177,22 +1177,22 @@ static ICE_noinline int unmap_and_move(new_page_t get_new_page,
 	if (!thp_migration_supported() && PageTransHuge(page))
 		return -ENOMEM;
 
-	newpage = get_new_page(page, private);
+	newpage = get_new_page(page, private); // compaction시 compaction_alloc()
 	if (!newpage)
 		return -ENOMEM;
 
-	if (page_count(page) == 1) {
+	if (page_count(page) == 1) { // page가 이미 free인 경우
 		/* page was freed from under us. So we are done. */
 		ClearPageActive(page);
 		ClearPageUnevictable(page);
-		if (unlikely(__PageMovable(page))) {
+		if (unlikely(__PageMovable(page))) { // non-lru movable 
 			lock_page(page);
-			if (!PageMovable(page))
+			if (!PageMovable(page)) // lru
 				__ClearPageIsolated(page);
 			unlock_page(page);
 		}
 		if (put_new_page)
-			put_new_page(newpage, private);
+			put_new_page(newpage, private); // compaction시 compaction_free()
 		else
 			put_page(newpage);
 		goto out;
@@ -1200,7 +1200,7 @@ static ICE_noinline int unmap_and_move(new_page_t get_new_page,
 
 	rc = __unmap_and_move(page, newpage, force, mode);
 	if (rc == MIGRATEPAGE_SUCCESS)
-		set_page_owner_migrate_reason(newpage, reason);
+		set_page_owner_migrate_reason(newpage, reason); // CONFIG_PAGE_OWNER 일때 동작
 
 out:
 	if (rc != -EAGAIN) {
@@ -1217,7 +1217,7 @@ out:
 		 * not accounted to NR_ISOLATED_*. They can be recognized
 		 * as __PageMovable
 		 */
-		if (likely(!__PageMovable(page)))
+		if (likely(!__PageMovable(page))) // non-LRU movable이 아닌경우
 			mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON +
 					page_is_file_cache(page), -hpage_nr_pages(page));
 	}
@@ -1240,22 +1240,22 @@ out:
 		}
 	} else {
 		if (rc != -EAGAIN) {
-			if (likely(!__PageMovable(page))) {
+			if (likely(!__PageMovable(page))) { // non-LRU movable이 아닌경우
 				putback_lru_page(page);
 				goto put_new;
 			}
 
 			lock_page(page);
-			if (PageMovable(page))
+			if (PageMovable(page)) // non-LRU movable인 경우
 				putback_movable_page(page);
-			else
+			else // non-LRU movable이 아닌경우
 				__ClearPageIsolated(page);
 			unlock_page(page);
 			put_page(page);
 		}
 put_new:
 		if (put_new_page)
-			put_new_page(newpage, private);
+			put_new_page(newpage, private); // compaction시 compaction_free()
 		else
 			put_page(newpage);
 	}
@@ -1399,7 +1399,7 @@ out:
  * or free list only if ret != 0.
  *
  * Returns the number of pages that were not migrated, or an error code.
- */
+ */ // 최대 10번을 시도하여 migrate 스캐너가 isolation한 페이지를 unmap 한 후 free 스캐너가 isolation한 free 페이지로 migration한다
 int migrate_pages(struct list_head *from, new_page_t get_new_page,
 		free_page_t put_new_page, unsigned long private,
 		enum migrate_mode mode, int reason)
@@ -1419,7 +1419,7 @@ int migrate_pages(struct list_head *from, new_page_t get_new_page,
 	for(pass = 0; pass < 10 && retry; pass++) {
 		retry = 0;
 
-		list_for_each_entry_safe(page, page2, from, lru) {
+		list_for_each_entry_safe(page, page2, from, lru) { // from(cc->migratepages)에 있는 page에 대해 순회 (page2는 page가 삭제와 관계 없이(safe) 다음 노드를 가리키는 임시변수)
 retry:
 			cond_resched();
 

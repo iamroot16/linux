@@ -3046,13 +3046,13 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	zone = page_zone(page);
 	mt = get_pageblock_migratetype(page);
 
-	if (!is_migrate_isolate(mt)) {
+	if (!is_migrate_isolate(mt)) { // 페이지가 MIGRATE_ISOLATE이 아닌경우
 		/*
 		 * Obey watermarks as if the page was being allocated. We can
 		 * emulate a high-order watermark check with a raised order-0
 		 * watermark, because we already know our high-order page
 		 * exists.
-		 */
+		 */ // order 0을 요청하여(isolate할 것이므로) low 워터마크 + order 페이지 수 값으로도 워터마크 경계를 통과(ok)하지 못한 경우 실패(0)
 		watermark = zone->_watermark[WMARK_MIN] + (1UL << order);
 		if (!zone_watermark_ok(zone, 0, watermark, 0, ALLOC_CMA))
 			return 0;
@@ -3068,14 +3068,14 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	/*
 	 * Set the pageblock if the isolated page is at least half of a
 	 * pageblock
-	 */
+	 */ // order가 pageblock 크기의 50% 이상인 경우, order에 속한 페이지 블럭들에 대해 migration type 변경 가능 확인
 	if (order >= pageblock_order - 1) {
 		struct page *endpage = page + (1 << order) - 1;
 		for (; page < endpage; page += pageblock_nr_pages) {
 			int mt = get_pageblock_migratetype(page);
 			if (!is_migrate_isolate(mt) && !is_migrate_cma(mt)
 			    && !is_migrate_highatomic(mt))
-				set_pageblock_migratetype(page,
+				set_pageblock_migratetype(page, // MIGRATE_UNMOVABLE, MIGRATE_RECLAIMABLE -> MIGRATE_MOVABLE
 							  MIGRATE_MOVABLE);
 		}
 	}
