@@ -474,7 +474,7 @@ struct anon_vma *page_get_anon_vma(struct page *page)
 		goto out;
 
 	anon_vma = (struct anon_vma *) (anon_mapping - PAGE_MAPPING_ANON);
-	if (!atomic_inc_not_zero(&anon_vma->refcount)) {
+	if (!atomic_inc_not_zero(&anon_vma->refcount)) { // 잃어 버리지 않도록 1 증가
 		anon_vma = NULL;
 		goto out;
 	}

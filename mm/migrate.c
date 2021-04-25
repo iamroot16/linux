@@ -405,7 +405,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 	int dirty;
 	int expected_count = expected_page_refs(mapping, page) + extra_count;
 
-	if (!mapping) {
+	if (!mapping) { // anon pages
 		/* Anonymous page without mapping */
 		if (page_count(page) != expected_count)
 			return -EAGAIN;
@@ -444,7 +444,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 		__SetPageSwapBacked(newpage);
 		if (PageSwapCache(page)) {
 			SetPageSwapCache(newpage);
-			set_page_private(newpage, page_private(page));
+			set_page_private(newpage, page_private(page)); // private : swap area
 		}
 	} else {
 		VM_BUG_ON_PAGE(PageSwapCache(page), page);
@@ -935,7 +935,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	VM_BUG_ON_PAGE(!PageLocked(newpage), newpage);
 
-	mapping = page_mapping(page);
+	mapping = page_mapping(page); // Slab or Anon page이면 null, Swap Cache 인 경우 어드레스, 그외에는 address_space 매핑 
 
 	if (likely(is_lru)) {
 		if (!mapping)
@@ -953,7 +953,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 		else
 			rc = fallback_migrate_page(mapping, newpage,
 							page, mode);
-	} else {
+	} else { // non-lru movable
 		/*
 		 * In case of non-lru page, it could be released after
 		 * isolation step. In that case, we shouldn't try migration.
@@ -1011,7 +1011,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	int rc = -EAGAIN;
 	int page_was_mapped = 0;
 	struct anon_vma *anon_vma = NULL;
-	bool is_lru = !__PageMovable(page);
+	bool is_lru = !__PageMovable(page); // Not non-lru movable
 
 	if (!trylock_page(page)) {
 		if (!force || mode == MIGRATE_ASYNC)
@@ -1036,7 +1036,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 		lock_page(page);
 	}
 
-	if (PageWriteback(page)) {
+	if (PageWriteback(page)) { // page가 파일시스템에 writeback 중인 경우
 		/*
 		 * Only in the case of a full synchronous migration is it
 		 * necessary to wait for PageWriteback. In the async case,
@@ -1071,7 +1071,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * (and cannot be remapped so long as we hold the page lock).
 	 */
 	if (PageAnon(page) && !PageKsm(page))
-		anon_vma = page_get_anon_vma(page);
+		anon_vma = page_get_anon_vma(page); // reverse mapping : get anon_vma from page->mapping
 
 	/*
 	 * Block others from accessing the new page when we get around to
@@ -1084,7 +1084,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	if (unlikely(!trylock_page(newpage)))
 		goto out_unlock;
 
-	if (unlikely(!is_lru)) {
+	if (unlikely(!is_lru)) { // non-lru movable
 		rc = move_to_new_page(newpage, page, mode);
 		goto out_unlock_both;
 	}
@@ -1181,20 +1181,20 @@ static ICE_noinline int unmap_and_move(new_page_t get_new_page,
 	if (!newpage)
 		return -ENOMEM;
 
-	if (page_count(page) == 1) { // page가 이미 free인 경우
+	if (page_count(page) == 1) { // migrate하려고 했었던 page가 이미 free로 바뀐 경우(현재 여기서 사용하고 있으니까 1) -> migration할 필요가 없다 
 		/* page was freed from under us. So we are done. */
 		ClearPageActive(page);
 		ClearPageUnevictable(page);
 		if (unlikely(__PageMovable(page))) { // non-lru movable 
 			lock_page(page);
-			if (!PageMovable(page)) // lru
+			if (!PageMovable(page)) // 디바이스드라이버에 구현된 함수가 없으면
 				__ClearPageIsolated(page);
 			unlock_page(page);
 		}
 		if (put_new_page)
-			put_new_page(newpage, private); // compaction시 compaction_free()
+			put_new_page(newpage, private); // compaction시 compaction_free(), migrate 하려고 했었던 free 페이지를 freelist에 다시 넣는다
 		else
-			put_page(newpage);
+			put_page(newpage); // free 페이지를 버디 시스템으로 돌려 놓는다.
 		goto out;
 	}
 

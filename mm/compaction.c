@@ -78,9 +78,9 @@ static void split_map_pages(struct list_head *list)
 		order = page_private(page);
 		nr_pages = 1 << order;
 
-		post_alloc_hook(page, order, __GFP_MOVABLE);
+		post_alloc_hook(page, order, __GFP_MOVABLE); // set as order 0
 		if (order)
-			split_page(page, order);
+			split_page(page, order); // set as count 1 (current code in use)
 
 		for (i = 0; i < nr_pages; i++) {
 			list_add(&page->lru, &tmp_list);
@@ -546,7 +546,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 	unsigned int order;
 
 	/* Strict mode is for isolation, speed is secondary */
-	if (strict)
+	if (strict) // strict -> 1개 페이지 단위로 순회 & 페이지 블럭내에서 1번이라도 실패하면 루프 탈출 및 total_isolated = 0
 		stride = 1;
 
 	cursor = pfn_to_page(blockpfn);
@@ -604,7 +604,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 			if (!PageBuddy(page))
 				goto isolate_fail;
 		}
-
+		// 버디페이지임을 이미 확인 했으므로, page는 freepage임
 		/* Found a free page, will break it into order-0 pages */
 		order = page_order(page);
 		isolated = __isolate_free_page(page, order);
@@ -653,7 +653,7 @@ isolate_fail:
 	 * If strict isolation is requested by CMA then check that all the
 	 * pages requested were isolated. If there were any failures, 0 is
 	 * returned and CMA will fail.
-	 */
+	 */ // strict is true when called by isolate_freepages_range() - CMA
 	if (strict && blockpfn < end_pfn)
 		total_isolated = 0;
 
@@ -1481,7 +1481,7 @@ static void isolate_freepages(struct compact_control *cc)
 			continue;
 
 		/* Check the block is suitable for migration */
-		if (!suitable_migration_target(cc, page))
+		if (!suitable_migration_target(cc, page)) // check buddy
 			continue;
 
 		/* If isolation recently failed, do not retry */
@@ -1497,8 +1497,8 @@ static void isolate_freepages(struct compact_control *cc)
 			update_pageblock_skip(cc, page, block_start_pfn);
 
 		/* Are enough freepages isolated? */
-		if (cc->nr_freepages >= cc->nr_migratepages) { // migrate_pfn이 찾은 페이지를 옮길 수 있는 충분한 양의 페이지가 isolation된 경우
-			if (isolate_start_pfn >= block_end_pfn) {
+		if (cc->nr_freepages >= cc->nr_migratepages) { // migrate pages들을 옮길 수 있는 충분한 양의 free page들이 isolation된 경우
+			if (isolate_start_pfn >= block_end_pfn) { // block_start_pfn ~ block_end_pfn ~ isolate_start_pfn : when block_end_pfn is zone_end_pfn & the first iteration (?)
 				/*
 				 * Restart at previous pageblock if more
 				 * freepages can be isolated next time.
@@ -1507,7 +1507,7 @@ static void isolate_freepages(struct compact_control *cc)
 					block_start_pfn - pageblock_nr_pages;
 			}
 			break;
-		} else if (isolate_start_pfn < block_end_pfn) {
+		} else if (isolate_start_pfn < block_end_pfn) { // block_start_pfn ~ isolate_start_pfn ~ block_end_pfn : search start with isolate_start_pfn, later
 			/*
 			 * If isolation failed early, do not continue
 			 * needlessly.
@@ -1517,10 +1517,10 @@ static void isolate_freepages(struct compact_control *cc)
 
 		/* Adjust stride depending on isolation */
 		if (nr_isolated) {
-			stride = 1;
+			stride = 1; // fine search with stride 1 when any pages are isolated
 			continue;
 		}
-		stride = min_t(unsigned int, COMPACT_CLUSTER_MAX, stride << 1);
+		stride = min_t(unsigned int, COMPACT_CLUSTER_MAX, stride << 1); // coarse search with stride x2 when nothing is isolated
 	}
 
 	/*
@@ -1533,7 +1533,7 @@ static void isolate_freepages(struct compact_control *cc)
 
 splitmap:
 	/* __isolate_free_page() does not map the pages */
-	split_map_pages(freelist);
+	split_map_pages(freelist); // split as order 0
 }
 
 /*
