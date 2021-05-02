@@ -265,11 +265,11 @@ static inline void copy_user_highpage(struct page *to, struct page *from,
 
 static inline void copy_highpage(struct page *to, struct page *from)
 {
-	char *vfrom, *vto;
+	char *vfrom, *vto; // kernel's address
 
 	vfrom = kmap_atomic(from);
 	vto = kmap_atomic(to);
-	copy_page(vto, vfrom);
+	copy_page(vto, vfrom); // memcpy
 	kunmap_atomic(vto);
 	kunmap_atomic(vfrom);
 }

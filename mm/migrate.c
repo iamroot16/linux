@@ -405,7 +405,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 	int dirty;
 	int expected_count = expected_page_refs(mapping, page) + extra_count;
 
-	if (!mapping) { // anon pages
+	if (!mapping) { // 1 for anonymous pages without a mapping : anon pages (not swap cache) or slab
 		/* Anonymous page without mapping */
 		if (page_count(page) != expected_count)
 			return -EAGAIN;
@@ -428,7 +428,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 		return -EAGAIN;
 	}
 
-	if (!page_ref_freeze(page, expected_count)) {
+	if (!page_ref_freeze(page, expected_count)) { // freeze : lock처럼 다른 cpu가 접근중인지 확인
 		xas_unlock_irq(&xas);
 		return -EAGAIN;
 	}
@@ -444,7 +444,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 		__SetPageSwapBacked(newpage);
 		if (PageSwapCache(page)) {
 			SetPageSwapCache(newpage);
-			set_page_private(newpage, page_private(page)); // private : swap area
+			set_page_private(newpage, page_private(page));
 		}
 	} else {
 		VM_BUG_ON_PAGE(PageSwapCache(page), page);
@@ -689,9 +689,9 @@ int migrate_page(struct address_space *mapping,
 	if (rc != MIGRATEPAGE_SUCCESS)
 		return rc;
 
-	if (mode != MIGRATE_SYNC_NO_COPY)
+	if (mode != MIGRATE_SYNC_NO_COPY) // copy page descriptor and page frame
 		migrate_page_copy(newpage, page);
-	else
+	else // copy only page descriptor (page frame will be copied by DMA later)
 		migrate_page_states(newpage, page);
 	return MIGRATEPAGE_SUCCESS;
 }
@@ -938,9 +938,9 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 	mapping = page_mapping(page); // Slab or Anon page이면 null, Swap Cache 인 경우 어드레스, 그외에는 address_space 매핑 
 
 	if (likely(is_lru)) {
-		if (!mapping)
+		if (!mapping) // anon 페이지의 migration
 			rc = migrate_page(mapping, newpage, page, mode);
-		else if (mapping->a_ops->migratepage)
+		else if (mapping->a_ops->migratepage) // swap 캐시 및 파일 캐시 페이지의 (*migratepage)를 사용한 migration
 			/*
 			 * Most pages have a mapping and most filesystems
 			 * provide a migratepage callback. Anonymous pages
@@ -950,10 +950,10 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 			 */
 			rc = mapping->a_ops->migratepage(mapping, newpage,
 							page, mode);
-		else
+		else // swap 캐시 및 파일 캐시 페이지의 (*migratepage)가 없을 때 사용한 fallback migration
 			rc = fallback_migrate_page(mapping, newpage,
 							page, mode);
-	} else { // non-lru movable
+	} else { // non-lru 페이지 migration
 		/*
 		 * In case of non-lru page, it could be released after
 		 * isolation step. In that case, we shouldn't try migration.
@@ -974,9 +974,9 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 	/*
 	 * When successful, old pagecache page->mapping must be cleared before
 	 * page is freed; but stats require that PageAnon be left as PageAnon.
-	 */
+	 */ // 기존 페이지가 migrate 성공해서, free 페이지로 바뀐 경우
 	if (rc == MIGRATEPAGE_SUCCESS) {
-		if (__PageMovable(page)) {
+		if (__PageMovable(page)) { // non-lru movable
 			VM_BUG_ON_PAGE(!PageIsolated(page), page);
 
 			/*
@@ -991,7 +991,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 		 * free_pages_prepare so don't reset it here for keeping
 		 * the type to work PageAnon, for example.
 		 */
-		if (!PageMappingFlags(page))
+		if (!PageMappingFlags(page)) // page->mapping 플래그 값이 0이면(address space가 mapping된 경우)
 			page->mapping = NULL;
 
 		if (unlikely(is_zone_device_page(newpage))) {
@@ -1070,7 +1070,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * because that implies that the anon page is no longer mapped
 	 * (and cannot be remapped so long as we hold the page lock).
 	 */
-	if (PageAnon(page) && !PageKsm(page))
+	if (PageAnon(page) && !PageKsm(page)) // anon page but not KSM
 		anon_vma = page_get_anon_vma(page); // reverse mapping : get anon_vma from page->mapping
 
 	/*
@@ -1101,13 +1101,13 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * invisible to the vm, so the page can not be migrated.  So try to
 	 * free the metadata, so the page can be freed.
 	 */
-	if (!page->mapping) {
+	if (!page->mapping) { // 만일 anon 페이지이면서 별도의 버퍼를 사용하는(예: ksm) 경우 free 버퍼를 제거
 		VM_BUG_ON_PAGE(PageAnon(page), page);
 		if (page_has_private(page)) {
 			try_to_free_buffers(page);
 			goto out_unlock_both;
 		}
-	} else if (page_mapped(page)) {
+	} else if (page_mapped(page)) { // 그 외의 경우 이 페이지로 매핑된 모든 페이지 테이블에서 매핑을 해제
 		/* Establish migration ptes */
 		VM_BUG_ON_PAGE(PageAnon(page) && !PageKsm(page) && !anon_vma,
 				page);
@@ -1116,10 +1116,10 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 		page_was_mapped = 1;
 	}
 
-	if (!page_mapped(page))
-		rc = move_to_new_page(newpage, page, mode);
+	if (!page_mapped(page)) // 페이지 테이블에 매핑되지 않은 페이지인 경우
+		rc = move_to_new_page(newpage, page, mode); // 페이지를 new 페이지로 옮긴 후 매핑 제거 루틴을 수행할 필요 없이 곧바로 out_unlock_both 레이블로 이동
 
-	if (page_was_mapped)
+	if (page_was_mapped) // 페이지가 매핑되었었던 경우, 기존 페이지에 연결된 모든 매핑을 역매핑하여 새 페이지로 옮긴다.
 		remove_migration_ptes(page,
 			rc == MIGRATEPAGE_SUCCESS ? newpage : page, false);
 

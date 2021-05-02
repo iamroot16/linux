@@ -103,7 +103,7 @@ unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
 #endif
 
-#define cmpxchg(ptr, o, n)	cmpxchg_local((ptr), (o), (n))
+#define cmpxchg(ptr, o, n)	cmpxchg_local((ptr), (o), (n)) // old를 new로 바꾸고 old를 리턴, 리턴한 값이 다른 old값이면 실패
 #define cmpxchg64(ptr, o, n)	cmpxchg64_local((ptr), (o), (n))
 
 #endif /* __ASM_GENERIC_CMPXCHG_H */
