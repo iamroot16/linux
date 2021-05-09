@@ -1101,7 +1101,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * invisible to the vm, so the page can not be migrated.  So try to
 	 * free the metadata, so the page can be freed.
 	 */
-	if (!page->mapping) { // 만일 anon 페이지이면서 별도의 버퍼를 사용하는(예: ksm) 경우 free 버퍼를 제거
+	if (!page->mapping) { // 만일 anon 페이지이면서 별도의 버퍼를 사용하는(예: swap cache, ksm) 경우 free 버퍼를 제거(rmap을 할 필요가 없다)
 		VM_BUG_ON_PAGE(PageAnon(page), page);
 		if (page_has_private(page)) {
 			try_to_free_buffers(page);
@@ -1111,7 +1111,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 		/* Establish migration ptes */
 		VM_BUG_ON_PAGE(PageAnon(page) && !PageKsm(page) && !anon_vma,
 				page);
-		try_to_unmap(page,
+		try_to_unmap(page, // rmap
 			TTU_MIGRATION|TTU_IGNORE_MLOCK|TTU_IGNORE_ACCESS);
 		page_was_mapped = 1;
 	}

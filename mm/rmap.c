@@ -519,21 +519,21 @@ struct anon_vma *page_lock_anon_vma_read(struct page *page)
 
 	anon_vma = (struct anon_vma *) (anon_mapping - PAGE_MAPPING_ANON);
 	root_anon_vma = READ_ONCE(anon_vma->root);
-	if (down_read_trylock(&root_anon_vma->rwsem)) {
+	if (down_read_trylock(&root_anon_vma->rwsem)) { // root_anon_vma(anon_vma 전체)에 lock
 		/*
 		 * If the page is still mapped, then this anon_vma is still
 		 * its anon_vma, and holding the mutex ensures that it will
 		 * not go away, see anon_vma_free().
 		 */
 		if (!page_mapped(page)) {
-			up_read(&root_anon_vma->rwsem);
+			up_read(&root_anon_vma->rwsem); // semaphore lock
 			anon_vma = NULL;
 		}
 		goto out;
 	}
 
 	/* trylock failed, we got to sleep */
-	if (!atomic_inc_not_zero(&anon_vma->refcount)) {
+	if (!atomic_inc_not_zero(&anon_vma->refcount)) { // 해당 anon_vma가 lock(+1) 실패, 다른 cpu가 삭제함 
 		anon_vma = NULL;
 		goto out;
 	}
@@ -548,7 +548,7 @@ struct anon_vma *page_lock_anon_vma_read(struct page *page)
 	rcu_read_unlock();
 	anon_vma_lock_read(anon_vma);
 
-	if (atomic_dec_and_test(&anon_vma->refcount)) {
+	if (atomic_dec_and_test(&anon_vma->refcount)) { // unlock(-1)후 0인 경우 -> 실패(kernel 코드 버그(?))
 		/*
 		 * Oops, we held the last refcount, release the lock
 		 * and bail -- can't simply use put_anon_vma() because
@@ -1334,7 +1334,7 @@ void page_remove_rmap(struct page *page, bool compound)
 
 /*
  * @arg: enum ttu_flags will be passed to this argument
- */
+ */ // return false가 아니면 계속 순회한다
 static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		     unsigned long address, void *arg)
 {
@@ -1378,7 +1378,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		/*
 		 * If sharing is possible, start and end will be adjusted
 		 * accordingly.
-		 */
+		 */ // Huge page(2M) 단위로 변경
 		adjust_range_if_pmd_sharing_possible(vma, &range.start,
 						     &range.end);
 	}
@@ -1457,14 +1457,14 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		    is_zone_device_page(page)) {
 			swp_entry_t entry;
 			pte_t swp_pte;
-
+			// 기존 pte 매핑 엔트리 값을 가져오고 매핑을 클리어
 			pteval = ptep_get_and_clear(mm, pvmw.address, pvmw.pte);
 
 			/*
 			 * Store the pfn of the page in a special migration
 			 * pte. do_swap_page() will wait until the migration
 			 * pte is removed and then restart fault handling.
-			 */
+			 */ // 다시 swap 엔트리에 매핑을 수행
 			entry = make_migration_entry(page, 0);
 			swp_pte = swp_entry_to_pte(entry);
 			if (pte_soft_dirty(pteval))
@@ -1713,12 +1713,12 @@ bool try_to_unmap(struct page *page, enum ttu_flags flags)
 	 * temporary VMAs until after exec() completes.
 	 */
 	if ((flags & (TTU_MIGRATION|TTU_SPLIT_FREEZE))
-	    && !PageKsm(page) && PageAnon(page))
+	    && !PageKsm(page) && PageAnon(page)) // 일반적인 anon 인 경우
 		rwc.invalid_vma = invalid_migration_vma;
 
 	if (flags & TTU_RMAP_LOCKED)
 		rmap_walk_locked(page, &rwc);
-	else
+	else	
 		rmap_walk(page, &rwc);
 
 	return !page_mapcount(page) ? true : false;
@@ -1807,7 +1807,7 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 	struct anon_vma_chain *avc;
 
 	if (locked) {
-		anon_vma = page_anon_vma(page);
+		anon_vma = page_anon_vma(page); // mapping으로 부터 anon_vma를 읽음
 		/* anon_vma disappear under us? */
 		VM_BUG_ON_PAGE(!anon_vma, page);
 	} else {
@@ -1816,11 +1816,11 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 	if (!anon_vma)
 		return;
 
-	pgoff_start = page_to_pgoff(page);
+	pgoff_start = page_to_pgoff(page); // 페이지 오프셋
 	pgoff_end = pgoff_start + hpage_nr_pages(page) - 1;
 	anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root,
-			pgoff_start, pgoff_end) {
-		struct vm_area_struct *vma = avc->vma;
+			pgoff_start, pgoff_end) { // iterate vma from anon_vma's red-black tree
+		struct vm_area_struct *vma = avc->vma; 
 		unsigned long address = vma_address(page, vma);
 
 		cond_resched();
@@ -1828,7 +1828,7 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 			continue;
 
-		if (!rwc->rmap_one(page, vma, address, rwc->arg))
+		if (!rwc->rmap_one(page, vma, address, rwc->arg)) 
 			break;
 		if (rwc->done && rwc->done(page))
 			break;

@@ -164,7 +164,7 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 			return not_found(pvmw);
 		return true;
 	}
-restart:
+restart: // 5 level : pgd->p4d->pud->pmd->pte
 	pgd = pgd_offset(mm, pvmw->address);
 	if (!pgd_present(*pgd))
 		return false;
@@ -237,7 +237,7 @@ next_pte:
 			} else {
 				pvmw->pte++;
 			}
-		} while (pte_none(*pvmw->pte));
+		} while (pte_none(*pvmw->pte)); // pte가 없으면 건너뛴다
 
 		if (!pvmw->ptl) {
 			pvmw->ptl = pte_lockptr(mm, pvmw->pmd);
