@@ -29,7 +29,7 @@ void sync_icache_aliases(void *kaddr, unsigned long len)
 {
 	unsigned long addr = (unsigned long)kaddr;
 
-	if (icache_is_aliasing()) {
+	if (icache_is_aliasing()) { // cache coloring:
 		__clean_dcache_area_pou(kaddr, len);
 		__flush_icache_all();
 	} else {

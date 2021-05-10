@@ -85,6 +85,7 @@ struct anon_vma_chain {
 #endif
 };
 
+// TTU: try to unmap
 enum ttu_flags {
 	TTU_MIGRATION		= 0x1,	/* migration mode */
 	TTU_MUNLOCK		= 0x2,	/* munlock mode */

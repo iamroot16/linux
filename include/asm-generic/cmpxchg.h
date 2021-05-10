@@ -103,7 +103,11 @@ unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
 #endif
 
+<<<<<<< Updated upstream
 #define cmpxchg(ptr, o, n)	cmpxchg_local((ptr), (o), (n)) // old를 new로 바꾸고 old를 리턴, 리턴한 값이 다른 old값이면 실패
+=======
+#define cmpxchg(ptr, o, n)	cmpxchg_local((ptr), (o), (n)) // atomic 해당 주소값을 바꾸는데, old 를 new 로 대체하고 old 값이 나옴. 보통 루프를 사용하여 다른 쪽에서 사용하여 값이 바뀌었는지 확인하도록 루프를 사용하여 구현함. 
+>>>>>>> Stashed changes
 #define cmpxchg64(ptr, o, n)	cmpxchg64_local((ptr), (o), (n))
 
 #endif /* __ASM_GENERIC_CMPXCHG_H */

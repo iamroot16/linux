@@ -23,7 +23,7 @@ static inline void reset_page_owner(struct page *page, unsigned int order)
 	if (static_branch_unlikely(&page_owner_inited))
 		__reset_page_owner(page, order);
 }
-
+// owner 트랙킹을 하여 누가 해당 페이지를 써는지, stack dump 처럼 추적하기 위해서!
 static inline void set_page_owner(struct page *page,
 			unsigned int order, gfp_t gfp_mask)
 {

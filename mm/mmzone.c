@@ -106,7 +106,7 @@ int page_cpupid_xchg_last(struct page *page, int cpupid)
 		old_flags = flags = page->flags;
 		last_cpupid = page_cpupid_last(page);
 
-		flags &= ~(LAST_CPUPID_MASK << LAST_CPUPID_PGSHIFT);
+		flags &= ~(LAST_CPUPID_MASK << LAST_CPUPID_PGSHIFT); // 특정 비트 영역을 지우겠다!
 		flags |= (cpupid & LAST_CPUPID_MASK) << LAST_CPUPID_PGSHIFT;
 	} while (unlikely(cmpxchg(&page->flags, old_flags, flags) != old_flags));
 

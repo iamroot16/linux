@@ -196,7 +196,7 @@ void putback_movable_pages(struct list_head *l)
 		}
 	}
 }
-
+// compaction 에서 unmap 을 하고, mapping 을 replace 해주는 함수임!
 /*
  * Restore a potential migration pte to a working pte entry
  */
@@ -625,11 +625,13 @@ void migrate_page_states(struct page *newpage, struct page *page)
 	if (page_is_idle(page))
 		set_page_idle(newpage);
 
+	// 해당 페이지에 마지막으로 접근했던 CPU 를 기록하기 위한 cpupid 임
+	// CPU and PID 두 가지 정보를 가지고 있는 플래그 값임.
 	/*
 	 * Copy NUMA information to the new page, to prevent over-eager
 	 * future migrations of this same page.
 	 */
-	cpupid = page_cpupid_xchg_last(page, -1);
+	cpupid = page_cpupid_xchg_last(page, -1); // CPU PID (process ID)?
 	page_cpupid_xchg_last(newpage, cpupid);
 
 	ksm_migrate_page(newpage, page);
@@ -986,14 +988,21 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 			__ClearPageIsolated(page);
 		}
 
+		// pageMappingFlags -> true === address_space 페이지 캐시임.
 		/*
 		 * Anonymous and movable page->mapping will be cleard by
 		 * free_pages_prepare so don't reset it here for keeping
 		 * the type to work PageAnon, for example.
 		 */
+<<<<<<< Updated upstream
 		if (!PageMappingFlags(page)) // page->mapping 플래그 값이 0이면(address space가 mapping된 경우)
 			page->mapping = NULL;
 
+=======
+		if (!PageMappingFlags(page)) // page->mapping 하위 2비트 플래그의 값이 없으면!
+			page->mapping = NULL; // address_space 구조체 포인터 또는 익명 매핑에 사용하는 anon_vma 임!!
+// 파일 매핑일 경우 여기서 NULL 값으로 넣어주고, 다른 경우는 다른 곳에서 해줌!
+>>>>>>> Stashed changes
 		if (unlikely(is_zone_device_page(newpage))) {
 			if (is_device_public_page(newpage))
 				flush_dcache_page(newpage);
@@ -1101,10 +1110,14 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * invisible to the vm, so the page can not be migrated.  So try to
 	 * free the metadata, so the page can be freed.
 	 */
+<<<<<<< Updated upstream
 	if (!page->mapping) { // 만일 anon 페이지이면서 별도의 버퍼를 사용하는(예: swap cache, ksm) 경우 free 버퍼를 제거(rmap을 할 필요가 없다)
+=======
+	if (!page->mapping) { // mapping 이 안되어 있어서 try_to_unmap 을 할 필요가 없음!
+>>>>>>> Stashed changes
 		VM_BUG_ON_PAGE(PageAnon(page), page);
-		if (page_has_private(page)) {
-			try_to_free_buffers(page);
+		if (page_has_private(page)) { // private buffer 가 만들어져 있는 경우!
+			try_to_free_buffers(page); // 왜 페이지 버퍼까지 지울까??
 			goto out_unlock_both;
 		}
 	} else if (page_mapped(page)) { // 그 외의 경우 이 페이지로 매핑된 모든 페이지 테이블에서 매핑을 해제
