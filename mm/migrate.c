@@ -994,15 +994,9 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 		 * free_pages_prepare so don't reset it here for keeping
 		 * the type to work PageAnon, for example.
 		 */
-<<<<<<< Updated upstream
 		if (!PageMappingFlags(page)) // page->mapping 플래그 값이 0이면(address space가 mapping된 경우)
-			page->mapping = NULL;
-
-=======
-		if (!PageMappingFlags(page)) // page->mapping 하위 2비트 플래그의 값이 없으면!
 			page->mapping = NULL; // address_space 구조체 포인터 또는 익명 매핑에 사용하는 anon_vma 임!!
 // 파일 매핑일 경우 여기서 NULL 값으로 넣어주고, 다른 경우는 다른 곳에서 해줌!
->>>>>>> Stashed changes
 		if (unlikely(is_zone_device_page(newpage))) {
 			if (is_device_public_page(newpage))
 				flush_dcache_page(newpage);
@@ -1110,11 +1104,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * invisible to the vm, so the page can not be migrated.  So try to
 	 * free the metadata, so the page can be freed.
 	 */
-<<<<<<< Updated upstream
 	if (!page->mapping) { // 만일 anon 페이지이면서 별도의 버퍼를 사용하는(예: swap cache, ksm) 경우 free 버퍼를 제거(rmap을 할 필요가 없다)
-=======
-	if (!page->mapping) { // mapping 이 안되어 있어서 try_to_unmap 을 할 필요가 없음!
->>>>>>> Stashed changes
 		VM_BUG_ON_PAGE(PageAnon(page), page);
 		if (page_has_private(page)) { // private buffer 가 만들어져 있는 경우!
 			try_to_free_buffers(page); // 왜 페이지 버퍼까지 지울까??

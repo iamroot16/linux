@@ -526,11 +526,7 @@ struct anon_vma *page_lock_anon_vma_read(struct page *page)
 		 * not go away, see anon_vma_free().
 		 */
 		if (!page_mapped(page)) {
-<<<<<<< Updated upstream
-			up_read(&root_anon_vma->rwsem); // semaphore lock
-=======
 			up_read(&root_anon_vma->rwsem); // down & up semaphore 관련!
->>>>>>> Stashed changes
 			anon_vma = NULL;
 		}
 		goto out;

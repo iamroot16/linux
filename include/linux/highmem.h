@@ -269,11 +269,7 @@ static inline void copy_highpage(struct page *to, struct page *from)
 
 	vfrom = kmap_atomic(from); // 커널 가상 주소임. 유저 가상 주소 아님!
 	vto = kmap_atomic(to);
-<<<<<<< Updated upstream
-	copy_page(vto, vfrom); // memcpy
-=======
 	copy_page(vto, vfrom); // aarch 별도로 성능을 위해 어셈블리 코드 copy_page.S 참고: include/asm-generic/page.h
->>>>>>> Stashed changes
 	kunmap_atomic(vto);
 	kunmap_atomic(vfrom);
 }
