@@ -75,7 +75,7 @@ static void __page_cache_release(struct page *page)
 
 static void __put_single_page(struct page *page)
 {
-	__page_cache_release(page);
+	__page_cache_release(page); // 페이지캐시 - 파일
 	free_unref_page(page);
 }
 

@@ -164,7 +164,7 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 			return not_found(pvmw);
 		return true;
 	}
-restart: // 5 level : pgd->p4d->pud->pmd->pte
+restart: // get pgd~pmd @ 5 level : pgd->p4d->pud->pmd->pte
 	pgd = pgd_offset(mm, pvmw->address);
 	if (!pgd_present(*pgd))
 		return false;
@@ -188,7 +188,7 @@ restart: // 5 level : pgd->p4d->pud->pmd->pte
 				return not_found(pvmw);
 			if (pmd_page(*pvmw->pmd) != page)
 				return not_found(pvmw);
-			return true;
+			return true; // pmd 엔트리가 trans huge이고, pmd 엔트리까지의 단계로 완료
 		} else if (!pmd_present(*pvmw->pmd)) {
 			if (thp_migration_supported()) {
 				if (!(pvmw->flags & PVMW_MIGRATION))
@@ -198,7 +198,7 @@ restart: // 5 level : pgd->p4d->pud->pmd->pte
 
 					if (migration_entry_to_page(entry) != page)
 						return not_found(pvmw);
-					return true;
+					return true; // pmd 엔트리가 trans huge이고, pmd 엔트리까지의 단계로 완료
 				}
 			}
 			return not_found(pvmw);
@@ -224,7 +224,7 @@ next_pte:
 			if (pvmw->address >= pvmw->vma->vm_end ||
 			    pvmw->address >=
 					__vma_address(pvmw->page, pvmw->vma) +
-					hpage_nr_pages(pvmw->page) * PAGE_SIZE)
+					hpage_nr_pages(pvmw->page) * PAGE_SIZE) // pvmw->address가 vma 영역의 가상주소 범위를 벗어난 경우
 				return not_found(pvmw);
 			/* Did we cross page table boundary? */
 			if (pvmw->address % PMD_SIZE == 0) {
@@ -237,7 +237,7 @@ next_pte:
 			} else {
 				pvmw->pte++;
 			}
-		} while (pte_none(*pvmw->pte)); // pte가 없으면 건너뛴다
+		} while (pte_none(*pvmw->pte)); // pte가 없는 경우 반복
 
 		if (!pvmw->ptl) {
 			pvmw->ptl = pte_lockptr(mm, pvmw->pmd);

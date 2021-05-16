@@ -1229,12 +1229,12 @@ static void page_remove_file_rmap(struct page *page, bool compound)
 			if (atomic_add_negative(-1, &page[i]._mapcount))
 				nr++;
 		}
-		if (!atomic_add_negative(-1, compound_mapcount_ptr(page)))
+		if (!atomic_add_negative(-1, compound_mapcount_ptr(page))) // 역방향 매핑(rmap)을 제거
 			goto out;
 		VM_BUG_ON_PAGE(!PageSwapBacked(page), page);
 		__dec_node_page_state(page, NR_SHMEM_PMDMAPPED);
 	} else {
-		if (!atomic_add_negative(-1, &page->_mapcount))
+		if (!atomic_add_negative(-1, &page->_mapcount)) // 역방향 매핑(rmap)을 제거
 			goto out;
 	}
 
@@ -1255,7 +1255,7 @@ static void page_remove_anon_compound_rmap(struct page *page)
 {
 	int i, nr;
 
-	if (!atomic_add_negative(-1, compound_mapcount_ptr(page)))
+	if (!atomic_add_negative(-1, compound_mapcount_ptr(page))) // rmap
 		return;
 
 	/* Hugepages are not counted in NR_ANON_PAGES for now. */
@@ -1267,7 +1267,7 @@ static void page_remove_anon_compound_rmap(struct page *page)
 
 	__dec_node_page_state(page, NR_ANON_THPS);
 
-	if (TestClearPageDoubleMap(page)) {
+	if (TestClearPageDoubleMap(page)) { // PG_double_map
 		/*
 		 * Subpages can be mapped with PTEs too. Check how many of
 		 * themi are still mapped.
@@ -1306,7 +1306,7 @@ void page_remove_rmap(struct page *page, bool compound)
 
 	/* page still mapped by someone else? */
 	if (!atomic_add_negative(-1, &page->_mapcount))
-		return;
+		return; // 혼자 쓰면 리턴
 
 	/*
 	 * We use the irq-unsafe __{inc|mod}_zone_page_stat because
@@ -1384,7 +1384,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	}
 	mmu_notifier_invalidate_range_start(&range);
 
-	while (page_vma_mapped_walk(&pvmw)) {
+	while (page_vma_mapped_walk(&pvmw)) { // pvmw를 통해 요청한 정규 매핑 상태가 정상(true)인 경우에 한해 루프를 돈다.
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
 		/* PMD-mapped THP migration entry */
 		if (!pvmw.pte && (flags & TTU_MIGRATION)) {
@@ -1423,7 +1423,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 
 		subpage = page - page_to_pfn(page) + pte_pfn(*pvmw.pte);
 		address = pvmw.address;
-
+		// 공유되지 않은 huge 페이지인 경우 range 영역에 대해 캐시 및 tlb 캐시를 플러시하고, secondary MMU의 range에 대한 tlb 무효화를 수행한다. 그런 후 루프를 멈추고 처리도 중단하게 한다.
 		if (PageHuge(page)) {
 			if (huge_pmd_unshare(mm, &address, pvmw.pte)) {
 				/*
@@ -1486,9 +1486,9 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			}
 		}
 
-		/* Nuke the page table entry. */
+		/* Nuke the page table entry. */ // 유저 가상 주소에 대한 캐시를 flush (아키텍처의 캐시 타입이 vivt 또는 vipt aliasing 등을 사용시)
 		flush_cache_page(vma, address, pte_pfn(*pvmw.pte));
-		if (should_defer_flush(mm, flags)) {
+		if (should_defer_flush(mm, flags)) { // TTU_BATCH_FLUSH 플러그 요청을 받은 경우 tlb flush는 마지막에 모아 처리하는 것으로 성능을 높인다.
 			/*
 			 * We clear the PTE but do not flush so potentially
 			 * a remote CPU could still be writing to the page.
@@ -1540,7 +1540,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			mmu_notifier_invalidate_range(mm, address,
 						      address + PAGE_SIZE);
 		} else if (IS_ENABLED(CONFIG_MIGRATION) &&
-				(flags & (TTU_MIGRATION|TTU_SPLIT_FREEZE))) {
+				(flags & (TTU_MIGRATION|TTU_SPLIT_FREEZE))) { // special swap migtation pte ???
 			swp_entry_t entry;
 			pte_t swp_pte;
 
@@ -1555,7 +1555,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			 * Store the pfn of the page in a special migration
 			 * pte. do_swap_page() will wait until the migration
 			 * pte is removed and then restart fault handling.
-			 */
+			 */ // migration할 swap 엔트리를 매핑
 			entry = make_migration_entry(subpage,
 					pte_write(pteval));
 			swp_pte = swp_entry_to_pte(entry);
@@ -1584,8 +1584,8 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			}
 
 			/* MADV_FREE page check */
-			if (!PageSwapBacked(page)) {
-				if (!PageDirty(page)) {
+			if (!PageSwapBacked(page)) { // When memory pressure is high, we free MADV_FREE pages. 
+				if (!PageDirty(page)) { // If the pages are not dirty in pte, the pages could be freed immediately. 
 					/* Invalidate as we cleared the pte */
 					mmu_notifier_invalidate_range(mm,
 						address, address + PAGE_SIZE);
@@ -1596,7 +1596,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				/*
 				 * If the page was redirtied, it cannot be
 				 * discarded. Remap the page to page table.
-				 */
+				 */ // Otherwise we can't reclaim them. 
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				SetPageSwapBacked(page);
 				ret = false;
@@ -1604,19 +1604,19 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				break;
 			}
 
-			if (swap_duplicate(entry) < 0) {
+			if (swap_duplicate(entry) < 0) { // increase swap entry's ref counter & check fail
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				ret = false;
 				page_vma_mapped_walk_done(&pvmw);
 				break;
 			}
-			if (arch_unmap_one(mm, vma, address, pteval) < 0) {
+			if (arch_unmap_one(mm, vma, address, pteval) < 0) { // sparc_64 아키텍처 고유의 unmap 수행 
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				ret = false;
 				page_vma_mapped_walk_done(&pvmw);
 				break;
 			}
-			if (list_empty(&mm->mmlist)) {
+			if (list_empty(&mm->mmlist)) { // mm의 mmlist가 비어있는 경우 init_mm의 mmlist에 추가
 				spin_lock(&mmlist_lock);
 				if (list_empty(&mm->mmlist))
 					list_add(&mm->mmlist, &init_mm.mmlist);
@@ -1624,7 +1624,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			}
 			dec_mm_counter(mm, MM_ANONPAGES);
 			inc_mm_counter(mm, MM_SWAPENTS);
-			swp_pte = swp_entry_to_pte(entry);
+			swp_pte = swp_entry_to_pte(entry); // 스왑아웃 페이지 식별자를 PTE에 추가 -> 앞으로 이 페이지에 접근하연 스왑인이 된다
 			if (pte_soft_dirty(pteval))
 				swp_pte = pte_swp_mksoft_dirty(swp_pte);
 			set_pte_at(mm, address, pvmw.pte, swp_pte);
@@ -1644,7 +1644,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			 */
 			dec_mm_counter(mm, mm_counter_file(page));
 		}
-discard:
+discard: // 페이지의 rmap 매핑을 제거한 후 페이지 사용을 완료
 		/*
 		 * No need to call mmu_notifier_invalidate_range() it has be
 		 * done above for all cases requiring it to happen under page
@@ -1652,8 +1652,8 @@ discard:
 		 *
 		 * See Documentation/vm/mmu_notifier.rst
 		 */
-		page_remove_rmap(subpage, PageHuge(page));
-		put_page(page);
+		page_remove_rmap(subpage, PageHuge(page)); // _mapcount - 1 
+		put_page(page); // refcount - 1
 	}
 
 	mmu_notifier_invalidate_range_end(&range);
@@ -1824,7 +1824,7 @@ static void rmap_walk_anon(struct page *page, struct rmap_walk_control *rwc,
 		unsigned long address = vma_address(page, vma);
 
 		cond_resched();
-		// arg (플래그가 들엉 있는 비트맵 항목) 가 위반되는지 검사하고, 위반되면 건너뜀!
+		// arg (플래그가 들어 있는 비트맵 항목) 가 위반되는지 검사하고, 위반되면 건너뜀!
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 			continue;
 
