@@ -196,7 +196,7 @@ void putback_movable_pages(struct list_head *l)
 		}
 	}
 }
-// compaction 에서 unmap 을 하고, mapping 을 replace 해주는 함수임!
+// rmap 해주는 함수임!
 /*
  * Restore a potential migration pte to a working pte entry
  */
