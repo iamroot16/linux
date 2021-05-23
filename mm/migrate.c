@@ -214,7 +214,7 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 	swp_entry_t entry;
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
-	while (page_vma_mapped_walk(&pvmw)) {
+	while (page_vma_mapped_walk(&pvmw)) { // old 페이지에 매핑된 vma를 순회
 		if (PageKsm(page))
 			new = page;
 		else
@@ -231,7 +231,7 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 #endif
 
 		get_page(new);
-		pte = pte_mkold(mk_pte(new, READ_ONCE(vma->vm_page_prot)));
+		pte = pte_mkold(mk_pte(new, READ_ONCE(vma->vm_page_prot))); // pte 엔트리를 준비
 		if (pte_swp_soft_dirty(*pvmw.pte))
 			pte = pte_mksoft_dirty(pte);
 
@@ -263,9 +263,9 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 		} else
 #endif
 		{
-			set_pte_at(vma->vm_mm, pvmw.address, pvmw.pte, pte);
+			set_pte_at(vma->vm_mm, pvmw.address, pvmw.pte, pte); // pte 추가(정규매핑)  
 
-			if (PageAnon(new))
+			if (PageAnon(new)) // new 페이지를 역매핑에 추가
 				page_add_anon_rmap(new, vma, pvmw.address, false);
 			else
 				page_add_file_rmap(new, false);
@@ -1114,7 +1114,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 		/* Establish migration ptes */
 		VM_BUG_ON_PAGE(PageAnon(page) && !PageKsm(page) && !anon_vma,
 				page);
-		try_to_unmap(page, // rmap
+		try_to_unmap(page, // rmap page(found by migrate_pfn)
 			TTU_MIGRATION|TTU_IGNORE_MLOCK|TTU_IGNORE_ACCESS);
 		page_was_mapped = 1;
 	}
@@ -1122,7 +1122,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	if (!page_mapped(page)) // 페이지 테이블에 매핑되지 않은 페이지인 경우
 		rc = move_to_new_page(newpage, page, mode); // 페이지를 new 페이지로 옮긴 후 매핑 제거 루틴을 수행할 필요 없이 곧바로 out_unlock_both 레이블로 이동
 
-	if (page_was_mapped) // 페이지가 매핑되었었던 경우, 기존 페이지에 연결된 모든 매핑을 역매핑하여 새 페이지로 옮긴다.
+	if (page_was_mapped) // 페이지가 매핑되었었던 경우, page에 연결된 모든 매핑을 역매핑하여 newpage로 옮긴다.
 		remove_migration_ptes(page,
 			rc == MIGRATEPAGE_SUCCESS ? newpage : page, false);
 

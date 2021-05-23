@@ -905,7 +905,7 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
 
 	VM_BUG_ON(migratetype == -1);
-	if (likely(!is_migrate_isolate(migratetype)))
+	if (likely(!is_migrate_isolate(migratetype))) // isolate 타입은 free 페이지 카운터에 추가안함
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
 
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
@@ -923,7 +923,7 @@ continue_merging:
 
 		if (!pfn_valid_within(buddy_pfn))
 			goto done_merging;
-		if (!page_is_buddy(page, buddy, order))
+		if (!page_is_buddy(page, buddy, order)) // Is its buddy also free ?
 			goto done_merging;
 		/*
 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
@@ -939,7 +939,7 @@ continue_merging:
 		combined_pfn = buddy_pfn & pfn;
 		page = page + (combined_pfn - pfn);
 		pfn = combined_pfn;
-		order++;
+		order++; // combine buddy & page into higher order
 	}
 	if (max_order < MAX_ORDER) {
 		/* If we are here, it means order is >= pageblock_order.
@@ -957,7 +957,7 @@ continue_merging:
 			buddy = page + (buddy_pfn - pfn);
 			buddy_mt = get_pageblock_migratetype(buddy);
 
-			if (migratetype != buddy_mt
+			if (migratetype != buddy_mt // no further merging if migration types are different and one of them is isolation type
 					&& (is_migrate_isolate(migratetype) ||
 						is_migrate_isolate(buddy_mt)))
 				goto done_merging;
@@ -984,14 +984,14 @@ done_merging:
 		buddy_pfn = __find_buddy_pfn(combined_pfn, order + 1);
 		higher_buddy = higher_page + (buddy_pfn - combined_pfn);
 		if (pfn_valid_within(buddy_pfn) &&
-		    page_is_buddy(higher_page, higher_buddy, order + 1)) {
-			list_add_tail(&page->lru,
+		    page_is_buddy(higher_page, higher_buddy, order + 1)) { // 2번 combine될 가능성이 있을 때
+			list_add_tail(&page->lru, // tail(cold)
 				&zone->free_area[order].free_list[migratetype]);
 			goto out;
 		}
 	}
 
-	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
+	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]); // head(hot)
 out:
 	zone->free_area[order].nr_free++;
 }
@@ -1124,7 +1124,7 @@ static __always_inline bool free_pages_prepare(struct page *page,
 
 		if (compound)
 			ClearPageDoubleMap(page);
-		for (i = 1; i < (1 << order); i++) {
+		for (i = 1; i < (1 << order); i++) { // bad 페이지(map count, flag등) 여부를 확인
 			if (compound)
 				bad += free_tail_pages_check(page, page + i);
 			if (unlikely(free_pages_check(page + i))) {
@@ -1140,7 +1140,7 @@ static __always_inline bool free_pages_prepare(struct page *page,
 		__memcg_kmem_uncharge(page, order);
 	if (check_free)
 		bad += free_pages_check(page);
-	if (bad)
+	if (bad) // bad 페이지가 하나라도 있으면 실패
 		return false;
 
 	page_cpupid_reset_last(page);
@@ -1214,7 +1214,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 	LIST_HEAD(head);
 
 	while (count) {
-		struct list_head *list;
+		struct list_head *list; 
 
 		/*
 		 * Remove pages from lists in a round-robin fashion. A
@@ -1225,7 +1225,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		 */
 		do {
 			batch_free++;
-			if (++migratetype == MIGRATE_PCPTYPES)
+			if (++migratetype == MIGRATE_PCPTYPES) // iterate for all migratetypes
 				migratetype = 0;
 			list = &pcp->lists[migratetype];
 		} while (list_empty(list));
@@ -1234,10 +1234,10 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		if (batch_free == MIGRATE_PCPTYPES)
 			batch_free = count;
 
-		do {
+		do { // add to temporary list
 			page = list_last_entry(list, struct page, lru);
 			/* must delete to avoid corrupting pcp list */
-			list_del(&page->lru);
+			list_del(&page->lru); // remove the node from list
 			pcp->count--;
 
 			if (bulkfree_pcp_prepare(page))
@@ -2944,17 +2944,17 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn)
 	 * excessively into the page allocator
 	 */
 	if (migratetype >= MIGRATE_PCPTYPES) {
-		if (unlikely(is_migrate_isolate(migratetype))) {
-			free_one_page(zone, page, pfn, 0, migratetype);
+		if (unlikely(is_migrate_isolate(migratetype))) { // MIGRATE_ISOLATE
+			free_one_page(zone, page, pfn, 0, migratetype); // not pcp, but buddy
 			return;
 		}
-		migratetype = MIGRATE_MOVABLE;
+		migratetype = MIGRATE_MOVABLE; // MIGRATE_HIGHATOMIC, MIGRATE_CMA
 	}
 
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
-	list_add(&page->lru, &pcp->lists[migratetype]);
+	list_add(&page->lru, &pcp->lists[migratetype]); // add to pcp
 	pcp->count++;
-	if (pcp->count >= pcp->high) {
+	if (pcp->count >= pcp->high) { // pcp에 일정 분량만을 관리하기 위해 pcp->batch 수 만큼 pcp에서 버디 시스템으로 이동
 		unsigned long batch = READ_ONCE(pcp->batch);
 		free_pcppages_bulk(zone, batch, pcp);
 	}

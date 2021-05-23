@@ -141,7 +141,7 @@ struct alloc_context {
  *     P = B & ~(1 << O)
  *
  * Assumption: *_mem_map is contiguous at least up to MAX_ORDER
- */
+ */ // 0x1000 ^ (1 << 3) = 0x1008, 0x1008 ^ (1 << 3) = 0x1000
 static inline unsigned long
 __find_buddy_pfn(unsigned long page_pfn, unsigned int order)
 {
