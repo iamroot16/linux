@@ -819,7 +819,7 @@ static inline struct capture_control *task_capc(struct zone *zone)
 	struct capture_control *capc = current->capture_control;
 
 	return capc &&
-		!(current->flags & PF_KTHREAD) &&
+		!(current->flags & PF_KTHREAD) && // Not kernel thread
 		!capc->page &&
 		capc->cc->zone == zone &&
 		capc->cc->direct_compaction ? capc : NULL;
@@ -897,7 +897,7 @@ static inline void __free_one_page(struct page *page,
 	unsigned long uninitialized_var(buddy_pfn);
 	struct page *buddy;
 	unsigned int max_order;
-	struct capture_control *capc = task_capc(zone);
+	struct capture_control *capc = task_capc(zone); // Is this task 'direct-compaction' ?
 
 	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
 
@@ -913,7 +913,7 @@ static inline void __free_one_page(struct page *page,
 
 continue_merging:
 	while (order < max_order - 1) {
-		if (compaction_capture(capc, page, order, migratetype)) {
+		if (compaction_capture(capc, page, order, migratetype)) { // if this task is direct-compaction with the same order, don't merge & don't add to buddy system to reserve it for compaction requested task
 			__mod_zone_freepage_state(zone, -(1 << order),
 								migratetype);
 			return;
