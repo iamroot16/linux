@@ -276,7 +276,7 @@ int anon_vma_clone(struct vm_area_struct *dst, struct vm_area_struct *src)
 		}
 		anon_vma = pavc->anon_vma;
 		root = lock_anon_vma_root(root, anon_vma);
-		anon_vma_chain_link(dst, avc, anon_vma);
+		anon_vma_chain_link(dst, avc, anon_vma); // 부모 AV 와 자식 VMA 링크함
 
 		/*
 		 * Reuse existing anon_vma if its degree lower than two,
