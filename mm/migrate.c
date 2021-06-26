@@ -196,7 +196,7 @@ void putback_movable_pages(struct list_head *l)
 		}
 	}
 }
-// rmap 해주는 함수임!
+// rmap 을 이용해서 매핑을 지워주는 함수임!
 /*
  * Restore a potential migration pte to a working pte entry
  */
