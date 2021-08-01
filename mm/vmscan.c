@@ -1120,11 +1120,11 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		cond_resched();
 
-		page = lru_to_page(page_list);
+		page = lru_to_page(page_list); // get page from the tail of the page_list
 		list_del(&page->lru);
 
 		if (!trylock_page(page))
-			goto keep;
+			goto keep; // fail to set page lock
 
 		VM_BUG_ON_PAGE(PageActive(page), page);
 
@@ -1139,7 +1139,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		/* Double the slab pressure for mapped and swapcache pages */
 		if ((page_mapped(page) || PageSwapCache(page)) &&
 		    !(PageAnon(page) && !PageSwapBacked(page)))
-			sc->nr_scanned++;
+			sc->nr_scanned++; // related with vmppressure @ shrink_node
 
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
 			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
@@ -1162,12 +1162,12 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		 * pages are cycling through the LRU so quickly that the
 		 * pages marked for immediate reclaim are making it to the
 		 * end of the LRU a second time.
-		 */
+		 */ // BDI : Backing Device INFO (such as HDD, Flash memory...)
 		mapping = page_mapping(page);
 		if (((dirty || writeback) && mapping &&
 		     inode_write_congested(mapping->host)) ||
-		    (writeback && PageReclaim(page)))
-			stat->nr_congested++;
+		    (writeback && PageReclaim(page))) // write가 혼잡한 상태이거나 페이지가 writeback을 통해 회수가 진행되는 페이지인 경우 
+			stat->nr_congested++; 
 
 		/*
 		 * If a page at the tail of the LRU is under writeback, there
@@ -1212,14 +1212,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		 * takes to write them to disk.
 		 */
 		if (PageWriteback(page)) {
-			/* Case 1 above */
+			/* Case 1 above */ // swapd에서 회수 중인 페이지가 다시 돌아온 경우
 			if (current_is_kswapd() &&
 			    PageReclaim(page) &&
 			    test_bit(PGDAT_WRITEBACK, &pgdat->flags)) {
-				stat->nr_immediate++;
+				stat->nr_immediate++; // 처리 시간을 좀 더 주기위해
 				goto activate_locked;
 
-			/* Case 2 above */
+			/* Case 2 above */ // memcg를 통해 writeback을 하거나 아직 회수 중인 페이지가 아니거나 fs 사용 불가능한 상태인 경우
 			} else if (sane_reclaim(sc) ||
 			    !PageReclaim(page) || !may_enter_fs) {
 				/*
@@ -1233,7 +1233,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				 * then wait_on_page_writeback() to avoid OOM;
 				 * and it's also appropriate in global reclaim.
 				 */
-				SetPageReclaim(page);
+				SetPageReclaim(page); // 즉각 회수를 위해 reclaim 플래그를 설정
 				stat->nr_writeback++;
 				goto activate_locked;
 
