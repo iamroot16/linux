@@ -1233,7 +1233,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				 * then wait_on_page_writeback() to avoid OOM;
 				 * and it's also appropriate in global reclaim.
 				 */
-				SetPageReclaim(page); // 즉각 회수를 위해 reclaim 플래그를 설정
+				SetPageReclaim(page); // writeback후 inactive list로 이동ㅅ켜 즉각 회수를 위해 reclaim 플래그를 설정
 				stat->nr_writeback++;
 				goto activate_locked;
 
@@ -1251,14 +1251,14 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			references = page_check_references(page, sc);
 
 		switch (references) {
-		case PAGEREF_ACTIVATE:
+		case PAGEREF_ACTIVATE: // swapback 중인 페이지, 2 번 이상 참조된 페이지, 실행 파일 페이지가 참조된 경우
 			goto activate_locked;
-		case PAGEREF_KEEP:
+		case PAGEREF_KEEP: // 기타 페이지가 참조된 경우 
 			stat->nr_ref_keep++;
 			goto keep_locked;
 		case PAGEREF_RECLAIM:
 		case PAGEREF_RECLAIM_CLEAN:
-			; /* try to reclaim the page below */
+			; /* try to reclaim the page below */ // reclaim if it is clean(not dirty)
 		}
 
 		/*
@@ -1278,13 +1278,13 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 					 * Split pages without a PMD map right
 					 * away. Chances are some or all of the
 					 * tail pages can be freed without IO.
-					 */
+					 */ // mapcount가 0이면, 페이지를 split하여 order 0 페이지들을 page_list에 추가하고 return 0
 					if (!compound_mapcount(page) &&
 					    split_huge_page_to_list(page,
 								    page_list))
 						goto activate_locked;
 				}
-				if (!add_to_swap(page)) {
+				if (!add_to_swap(page)) { // 페이지를 swap 큐에 추가
 					if (!PageTransHuge(page))
 						goto activate_locked;
 					/* Fallback to swap normal pages */
@@ -1318,7 +1318,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 			if (unlikely(PageTransHuge(page)))
 				flags |= TTU_SPLIT_HUGE_PMD;
-			if (!try_to_unmap(page, flags)) {
+			if (!try_to_unmap(page, flags)) { // unmapping page table
 				stat->nr_unmap_fail++;
 				goto activate_locked;
 			}
@@ -1336,8 +1336,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			 * the same dirty pages again (PageReclaim).
 			 */
 			if (page_is_file_cache(page) &&
-			    (!current_is_kswapd() || !PageReclaim(page) ||
-			     !test_bit(PGDAT_DIRTY, &pgdat->flags))) {
+			    (!current_is_kswapd() || !PageReclaim(page) || // kswapd에서만 아래 pageout()을 사용
+			     !test_bit(PGDAT_DIRTY, &pgdat->flags))) { // direct reclaim 또는 노드가 dirty를 불허하는 경우
 				/*
 				 * Immediately reclaim when written back.
 				 * Similar in principal to deactivate_page()
@@ -1363,7 +1363,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			 * starts and then write it out here.
 			 */
 			try_to_unmap_flush_dirty();
-			switch (pageout(page, mapping, sc)) {
+			switch (pageout(page, mapping, sc)) { // dirty 페이지를 pageout() 함수를 통해 파일 시스템에 기록
 			case PAGE_KEEP:
 				goto keep_locked;
 			case PAGE_ACTIVATE:
@@ -1412,11 +1412,11 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		if (page_has_private(page)) {
 			if (!try_to_release_page(page, sc->gfp_mask))
 				goto activate_locked;
-			if (!mapping && page_count(page) == 1) {
+			if (!mapping && page_count(page) == 1) { // 매핑되지 않았거나 사용되지 않으면 
 				unlock_page(page);
 				if (put_page_testzero(page))
 					goto free_it;
-				else {
+				else { // 경쟁 상황에서 드물게 이미 free(ref_count == 0) 페이지인 경우
 					/*
 					 * rare race with speculative reference.
 					 * the speculative reference will free
@@ -1430,12 +1430,12 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			}
 		}
 
-		if (PageAnon(page) && !PageSwapBacked(page)) {
+		if (PageAnon(page) && !PageSwapBacked(page)) { // clean anon
 			/* follow __remove_mapping for reference */
-			if (!page_ref_freeze(page, 1))
+			if (!page_ref_freeze(page, 1)) // 사용자가 없으면 참조 카운터를 0으로 변경
 				goto keep_locked;
 			if (PageDirty(page)) {
-				page_ref_unfreeze(page, 1);
+				page_ref_unfreeze(page, 1); // dirty 페이지인 경우 참조 카운터를 1로 변경
 				goto keep_locked;
 			}
 
@@ -1451,7 +1451,7 @@ free_it:
 		/*
 		 * Is there need to periodically free_page_list? It would
 		 * appear not as the counts should be low
-		 */
+		 */ // memcg에도 보고하고 free_transhuge_page() 함수를 호출하여 order 0 페이지로 분해
 		if (unlikely(PageTransHuge(page))) {
 			mem_cgroup_uncharge(page);
 			(*get_compound_page_dtor(page))(page);
@@ -1463,9 +1463,9 @@ activate_locked:
 		/* Not a candidate for swapping, so reclaim swap space. */
 		if (PageSwapCache(page) && (mem_cgroup_swap_full(page) ||
 						PageMlocked(page)))
-			try_to_free_swap(page);
+			try_to_free_swap(page); // swap 캐시 페이지가 memcg swap 공간이 full 상태이거나 mlocked 페이지인 상태인 경우 
 		VM_BUG_ON_PAGE(PageActive(page), page);
-		if (!PageMlocked(page)) {
+		if (!PageMlocked(page)) { // mlocked 페이지가 아닌 경우 actvie 설정
 			SetPageActive(page);
 			stat->nr_activate++;
 			count_memcg_page_event(page, PGACTIVATE);
@@ -1479,9 +1479,9 @@ keep:
 
 	mem_cgroup_uncharge_list(&free_pages);
 	try_to_unmap_flush();
-	free_unref_page_list(&free_pages);
+	free_unref_page_list(&free_pages); // pcp에 회수
 
-	list_splice(&ret_pages, page_list);
+	list_splice(&ret_pages, page_list); // ret_pages 리스트는 @page_list의 선두로 다시 되돌리고(rotate)
 	count_vm_events(PGACTIVATE, stat->nr_activate);
 
 	return nr_reclaimed;
