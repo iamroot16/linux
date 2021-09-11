@@ -1673,7 +1673,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 		 */
 		scan++;
 		switch (__isolate_lru_page(page, mode)) {
-		case 0:
+		case 0: // isolation 성공
 			nr_pages = hpage_nr_pages(page);
 			nr_taken += nr_pages;
 			nr_zone_taken[page_zonenum(page)] += nr_pages;
@@ -1700,7 +1700,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 	if (!list_empty(&pages_skipped)) {
 		int zid;
 
-		list_splice(&pages_skipped, src);
+		list_splice(&pages_skipped, src); // pages_skipped를 src에 추가
 		for (zid = 0; zid < MAX_NR_ZONES; zid++) {
 			if (!nr_skipped[zid])
 				continue;
@@ -1906,20 +1906,20 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	lru_add_drain();
 
 	spin_lock_irq(&pgdat->lru_lock);
-
+	// lruvec에서 nr_to_scan 만큼 page_list에 분리해온다. 스캔 수는 nr_scanned에 담기고, 처리된 수는 nr_taken에 담겨반환
 	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &page_list,
 				     &nr_scanned, sc, lru);
 
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, nr_taken);
 	reclaim_stat->recent_scanned[file] += nr_taken;
 
-	if (current_is_kswapd()) {
+	if (current_is_kswapd()) { // kswapd 스캔 카운터를 증가
 		if (global_reclaim(sc))
 			__count_vm_events(PGSCAN_KSWAPD, nr_scanned);
 		count_memcg_events(lruvec_memcg(lruvec), PGSCAN_KSWAPD,
 				   nr_scanned);
 	} else {
-		if (global_reclaim(sc))
+		if (global_reclaim(sc)) // direct-reclaim 스캔 카운터를 증가
 			__count_vm_events(PGSCAN_DIRECT, nr_scanned);
 		count_memcg_events(lruvec_memcg(lruvec), PGSCAN_DIRECT,
 				   nr_scanned);
@@ -1928,32 +1928,32 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 
 	if (nr_taken == 0)
 		return 0;
-
+	// isolation된 페이지들이 담긴 page_list에서 shrink를 수행하고 그 중 회수된 페이지의 수를 알아온다.
 	nr_reclaimed = shrink_page_list(&page_list, pgdat, sc, 0,
 				&stat, false);
 
 	spin_lock_irq(&pgdat->lru_lock);
 
 	if (current_is_kswapd()) {
-		if (global_reclaim(sc))
+		if (global_reclaim(sc)) // kswapd 스캔 카운터를 증가
 			__count_vm_events(PGSTEAL_KSWAPD, nr_reclaimed);
 		count_memcg_events(lruvec_memcg(lruvec), PGSTEAL_KSWAPD,
 				   nr_reclaimed);
 	} else {
-		if (global_reclaim(sc))
+		if (global_reclaim(sc)) // direct-reclaim 스캔 카운터를 증가
 			__count_vm_events(PGSTEAL_DIRECT, nr_reclaimed);
 		count_memcg_events(lruvec_memcg(lruvec), PGSTEAL_DIRECT,
 				   nr_reclaimed);
 	}
 
-	putback_inactive_pages(lruvec, &page_list);
+	putback_inactive_pages(lruvec, &page_list); // 남은 page_list에 있는 페이지들을 inactive에 다시 rotate 한다
 
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
 
 	spin_unlock_irq(&pgdat->lru_lock);
 
 	mem_cgroup_uncharge_list(&page_list);
-	free_unref_page_list(&page_list);
+	free_unref_page_list(&page_list); // inactive lru 리스트로 돌아가지 않고 page_list에 남아있는 page들을 모두 버디 시스템으로 되돌린다.
 
 	/*
 	 * If dirty pages are scanned that are not queued for IO, it
@@ -2071,7 +2071,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	lru_add_drain();
 
 	spin_lock_irq(&pgdat->lru_lock);
-
+	// 지정한 lru 리스트로부터 nr_to_scan 만큼 스캔을 시도하여 분리된 페이지는 l_hold 리스트에 담고 분리된 페이지 수를 반환
 	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &l_hold,
 				     &nr_scanned, sc, lru);
 
@@ -2223,7 +2223,7 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 
 static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
-{
+{	// active 리스트에 대한 shrink 요청 시 inactive 리스트보다 페이지 수가 적으면 active 리스트에 대해 shrink를 수행하지 않는다.
 	if (is_active_lru(lru)) {
 		if (inactive_list_is_low(lruvec, is_file_lru(lru), sc, true))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
@@ -2490,7 +2490,7 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 		unsigned long nr_anon, nr_file, percentage;
 		unsigned long nr_scanned;
 
-		for_each_evictable_lru(lru) {
+		for_each_evictable_lru(lru) { // unevictable lru는 스캔 안함
 			if (nr[lru]) {
 				nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
 				nr[lru] -= nr_to_scan;
@@ -2504,14 +2504,14 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 
 		if (nr_reclaimed < nr_to_reclaim || scan_adjusted)
 			continue;
-
+		// 회수한 페이지가 목표치를 초과 달성한 경우
 		/*
 		 * For kswapd and memcg, reclaim at least the number of pages
 		 * requested. Ensure that the anon and file LRUs are scanned
 		 * proportionally what was requested by get_scan_count(). We
 		 * stop reclaiming one LRU and reduce the amount scanning
 		 * proportional to the original scan target.
-		 */
+		 */ // scan 비율을 조절하기 위해 먼저 스캔 후 남은 file 페이지 수와 anon 페이지 수를 준비
 		nr_file = nr[LRU_INACTIVE_FILE] + nr[LRU_ACTIVE_FILE];
 		nr_anon = nr[LRU_INACTIVE_ANON] + nr[LRU_ACTIVE_ANON];
 
@@ -2562,7 +2562,7 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	/*
 	 * Even if we did not try to evict anon pages at all, we want to
 	 * rebalance the anon lru active/inactive ratio.
-	 */
+	 */ // inactive anon이 active anon보다 작을 경우 active 리스트에 대해 shrink를 수행하여 active와 inactive간의 밸런스를 다시 잡아준다.
 	if (inactive_list_is_low(lruvec, false, sc, true))
 		shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 				   sc, LRU_ACTIVE_ANON);
@@ -2888,13 +2888,13 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		sc->reclaim_idx = gfp_zone(sc->gfp_mask);
 	}
 
-	for_each_zone_zonelist_nodemask(zone, z, zonelist,
+	for_each_zone_zonelist_nodemask(zone, z, zonelist, // build_zonelists_in_node_order()에서 만든 노드우선 존리스트를 순회
 					sc->reclaim_idx, sc->nodemask) {
 		/*
 		 * Take care memory controller reclaiming has small influence
 		 * to global LRU.
 		 */
-		if (global_reclaim(sc)) {
+		if (global_reclaim(sc)) { // target cgorup이 없는 경우
 			if (!cpuset_zone_allowed(zone,
 						 GFP_KERNEL | __GFP_HARDWALL))
 				continue;
@@ -2907,7 +2907,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			 * reclamation is disruptive enough to become a
 			 * noticeable problem, like transparent huge
 			 * page allocations.
-			 */
+			 */ // costly order 이면서 compaction만으로 처리할 수 있거나 또는 이미 free page가 있으면 shrink node(reclaim)를 skip
 			if (IS_ENABLED(CONFIG_COMPACTION) &&
 			    sc->order > PAGE_ALLOC_COSTLY_ORDER &&
 			    compaction_ready(zone, sc)) {
@@ -2920,8 +2920,8 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			 * zonelist is ordered by zone (not the default) then a
 			 * node may be shrunk multiple times but in that case
 			 * the user prefers lower zones being preserved.
-			 */
-			if (zone->zone_pgdat == last_pgdat)
+			 */ // 어떤 node에서 가장 낮은 zone에서 reclaim 하는것을 사용자가 선호한다
+			if (zone->zone_pgdat == last_pgdat) // Reclaim may stall if there is too much dirty or congested data on a node.
 				continue;
 
 			/*
@@ -2942,7 +2942,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		/* See comment about same check for global reclaim above */
 		if (zone->zone_pgdat == last_pgdat)
 			continue;
-		last_pgdat = zone->zone_pgdat;
+		last_pgdat = zone->zone_pgdat; // zone이 속한 node의 descriptor
 		shrink_node(zone->zone_pgdat, sc);
 	}
 
@@ -3015,7 +3015,7 @@ retry:
 		 */
 		if (sc->priority < DEF_PRIORITY - 2)
 			sc->may_writepage = 1;
-	} while (--sc->priority >= 0);
+	} while (--sc->priority >= 0); // 우선 순위를 최고까지 높여가며(0으로 갈수록 높아진다) 루프를 돈다.
 
 	last_pgdat = NULL;
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, sc->reclaim_idx,

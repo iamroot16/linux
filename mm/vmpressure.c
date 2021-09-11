@@ -139,8 +139,8 @@ static enum vmpressure_levels vmpressure_calc_level(unsigned long scanned,
 	 * scanned vs. reclaimed in a given time frame (window). Note that
 	 * time is in VM reclaimer's "ticks", i.e. number of pages
 	 * scanned. This makes it possible to set desired reaction time
-	 * and serves as a ratelimit.
-	 */
+	 * and serves as a ratelimit. // reclaimed : 0, scanned : 512 -> pressure : 100, reclaimed : 512, scanned : 512 -> pressure : 0 
+	 */ // reclaimed : 128, scanned : 512 -> pressure : 75
 	pressure = scale - (reclaimed * scale / scanned);
 	pressure = pressure * 100 / scale;
 
@@ -270,7 +270,7 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg, bool tree,
 	if (!scanned)
 		return;
 
-	if (tree) {
+	if (tree) { // 기존 tree 방식의 presssure를 계량
 		spin_lock(&vmpr->sr_lock);
 		scanned = vmpr->tree_scanned += scanned;
 		vmpr->tree_reclaimed += reclaimed;
@@ -278,8 +278,8 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg, bool tree,
 
 		if (scanned < vmpressure_win)
 			return;
-		schedule_work(&vmpr->work);
-	} else {
+		schedule_work(&vmpr->work); // vmpr->work에 등록한 이벤트 통지
+	} else { // 커널 내부 사용자에게 이벤트 통지하기 위해 @memcg를 위한 회수 효율성이 기록된다.
 		enum vmpressure_levels level;
 
 		/* For now, no users for root-level efficiency */
@@ -306,7 +306,7 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg, bool tree,
 			 * For hysteresis keep the pressure state
 			 * asserted for a second in which subsequent
 			 * pressure events can occur.
-			 */
+			 */ // 현재 시각보다 1초 뒤인 틱 값을 설정
 			memcg->socket_pressure = jiffies + HZ;
 		}
 	}
@@ -329,7 +329,7 @@ void vmpressure_prio(gfp_t gfp, struct mem_cgroup *memcg, int prio)
 	 * We only use prio for accounting critical level. For more info
 	 * see comment for vmpressure_level_critical_prio variable above.
 	 */
-	if (prio > vmpressure_level_critical_prio)
+	if (prio > vmpressure_level_critical_prio) // 3을 초과하는 priority에서는 리턴 (작은 수록 우선순위 높음)
 		return;
 
 	/*
