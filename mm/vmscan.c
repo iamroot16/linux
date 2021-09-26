@@ -2174,7 +2174,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
  *  100GB      31         3GB
  *    1TB     101        10GB
  *   10TB     320        32GB
- */
+ */ // anon, file의 lru에서 active/inactive의 비율로 low를 판단
 static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 				 struct scan_control *sc, bool actual_reclaim)
 {
@@ -2263,7 +2263,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	unsigned long anon, file;
 	unsigned long ap, fp;
 	enum lru_list lru;
-
+	// swap이 필요 없거나 swap space가 없는 경우 anon 페이지를 swap 할 수 없다
 	/* If we have no swap space, do not bother scanning anon pages. */
 	if (!sc->may_swap || mem_cgroup_get_nr_swap_pages(memcg) <= 0) {
 		scan_balance = SCAN_FILE;
@@ -2276,7 +2276,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * disable swapping for individual groups completely when
 	 * using the memory controller's swap limit feature would be
 	 * too expensive.
-	 */
+	 */ // target mem cgroup이(global) 아니고 swappiness이 0인 경우(swap 안함)
 	if (!global_reclaim(sc) && !swappiness) {
 		scan_balance = SCAN_FILE;
 		goto out;
@@ -2286,7 +2286,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * Do not apply any pressure balancing cleverness when the
 	 * system is close to OOM, scan both anon and file equally
 	 * (unless the swappiness setting disagrees with swapping).
-	 */
+	 */ // 최우선 순위 0(OOM이 가까와진)이고 swappiness 값이 주어진 경우
 	if (!sc->priority && swappiness) {
 		scan_balance = SCAN_EQUAL;
 		goto out;
@@ -2300,7 +2300,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * This means we have a runaway feedback loop where a tiny
 	 * thrashing file LRU becomes infinitely more attractive than
 	 * anon pages.  Try to detect this based on file LRU size.
-	 */
+	 */ // target cgroup만을 대상으로 하지 않는 경우 global reclaim
 	if (global_reclaim(sc)) {
 		unsigned long pgdatfile;
 		unsigned long pgdatfree;
@@ -2313,19 +2313,19 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 
 		for (z = 0; z < MAX_NR_ZONES; z++) {
 			struct zone *zone = &pgdat->node_zones[z];
-			if (!managed_zone(zone))
+			if (!managed_zone(zone)) // 버디할당자가 사용하지 않는 존이면
 				continue;
 
 			total_high_wmark += high_wmark_pages(zone);
 		}
 
-		if (unlikely(pgdatfile + pgdatfree <= total_high_wmark)) {
+		if (unlikely(pgdatfile + pgdatfree <= total_high_wmark)) { // file + free가 high_wmakr이하 -> File은 reclaim안함(thrasing 방지)
 			/*
 			 * Force SCAN_ANON if there are enough inactive
 			 * anonymous pages on the LRU in eligible zones.
 			 * Otherwise, the small LRU gets thrashed.
 			 */
-			if (!inactive_list_is_low(lruvec, false, sc, false) &&
+			if (!inactive_list_is_low(lruvec, false, sc, false) && // inactive * inactive_ratio < active 가 아니고, inactive anon 페이지 수가 0 이상
 			    lruvec_lru_size(lruvec, LRU_INACTIVE_ANON, sc->reclaim_idx)
 					>> sc->priority) {
 				scan_balance = SCAN_ANON;
@@ -2363,7 +2363,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * pages.  We use the recently rotated / recently scanned
 	 * ratios to determine how valuable each cache is.
 	 *
-	 * Because workloads change over time (and to avoid overflow)
+	 * Because workloads change over time (and to avoid overflow) // 아래에서 /= 2 하는 이유
 	 * we keep these statistics as a floating average, which ends
 	 * up weighing recent references more than old ones.
 	 *
@@ -2390,7 +2390,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * The amount of pressure on anon vs file pages is inversely
 	 * proportional to the fraction of recently scanned pages on
 	 * each list that were recently referenced and in active use.
-	 */
+	 */ // ap : anon pressure, fp : file pressure
 	ap = anon_prio * (reclaim_stat->recent_scanned[0] + 1);
 	ap /= reclaim_stat->recent_rotated[0] + 1;
 
@@ -2400,16 +2400,16 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 
 	fraction[0] = ap;
 	fraction[1] = fp;
-	denominator = ap + fp + 1;
+	denominator = ap + fp + 1; // 분모가 0이 되지 않도록 + 1
 out:
 	*lru_pages = 0;
-	for_each_evictable_lru(lru) {
+	for_each_evictable_lru(lru) { // LRU_UNEVICTABLE을 제외한 나머지 LRU들을 순회 
 		int file = is_file_lru(lru);
 		unsigned long size;
 		unsigned long scan;
 
 		size = lruvec_lru_size(lruvec, lru, sc->reclaim_idx);
-		scan = size >> sc->priority;
+		scan = size >> sc->priority; // 우선순위가 최우선(0)이면 size
 		/*
 		 * If the cgroup's already been deleted, make sure to
 		 * scrape out the remaining cache.
@@ -2434,7 +2434,7 @@ out:
 		case SCAN_FILE:
 		case SCAN_ANON:
 			/* Scan one type exclusively */
-			if ((scan_balance == SCAN_FILE) != file) {
+			if ((scan_balance == SCAN_FILE) != file) { // SCAN_FILE : T != File, SCAN_ANON : F != File
 				size = 0;
 				scan = 0;
 			}
@@ -2444,8 +2444,8 @@ out:
 			BUG();
 		}
 
-		*lru_pages += size;
-		nr[lru] = scan;
+		*lru_pages += size; // 페이지수
+		nr[lru] = scan; // 스캔수(가중치)
 	}
 }
 
@@ -2465,7 +2465,7 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	struct blk_plug plug;
 	bool scan_adjusted;
 
-	get_scan_count(lruvec, memcg, sc, nr, lru_pages);
+	get_scan_count(lruvec, memcg, sc, nr, lru_pages); // nr[]에 스캔할 페이지 수를 설정
 
 	/* Record the original scan target for proportional adjustments later */
 	memcpy(targets, nr, sizeof(nr));
@@ -2480,20 +2480,20 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	 * do a batch of work at once. For memcg reclaim one check is made to
 	 * abort proportional reclaim if either the file or anon lru has already
 	 * dropped to zero at the first pass.
-	 */
+	 */ // little memory pressure  -> 이미 scan_adjusted한걸로 표시
 	scan_adjusted = (global_reclaim(sc) && !current_is_kswapd() &&
 			 sc->priority == DEF_PRIORITY);
 
 	blk_start_plug(&plug);
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
-					nr[LRU_INACTIVE_FILE]) {
+					nr[LRU_INACTIVE_FILE]) { // LRU_ACTIVE_ANON은 안함
 		unsigned long nr_anon, nr_file, percentage;
 		unsigned long nr_scanned;
 
-		for_each_evictable_lru(lru) { // unevictable lru는 스캔 안함
+		for_each_evictable_lru(lru) { // unevictable lru를 제외한 나머지 lru를 순회
 			if (nr[lru]) {
 				nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
-				nr[lru] -= nr_to_scan;
+				nr[lru] -= nr_to_scan; // shrink_list에서 scan할 페이지 수를 미리 빼준다
 
 				nr_reclaimed += shrink_list(lru, nr_to_scan,
 							    lruvec, sc);
@@ -2504,14 +2504,14 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 
 		if (nr_reclaimed < nr_to_reclaim || scan_adjusted)
 			continue;
-		// 회수한 페이지가 목표치를 초과 달성한 경우
-		/*
+		// 회수한 페이지가 목표치를 초과 달성하면서 scan_adjusted 가 아닌경우
+		/* // get_scan_count()와 다른 식으로 anon과 file 페이지의 스캔 비율을 1회에 한하여 재조정
 		 * For kswapd and memcg, reclaim at least the number of pages
 		 * requested. Ensure that the anon and file LRUs are scanned
 		 * proportionally what was requested by get_scan_count(). We
 		 * stop reclaiming one LRU and reduce the amount scanning
 		 * proportional to the original scan target.
-		 */ // scan 비율을 조절하기 위해 먼저 스캔 후 남은 file 페이지 수와 anon 페이지 수를 준비
+		 */ // scan 비율을 조절하기 위해 먼저 스캔 해야할 file 페이지 수와 anon 페이지 수를 준비
 		nr_file = nr[LRU_INACTIVE_FILE] + nr[LRU_ACTIVE_FILE];
 		nr_anon = nr[LRU_INACTIVE_ANON] + nr[LRU_ACTIVE_ANON];
 
@@ -2520,10 +2520,10 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 		 * has gone to zero.  And given the way we stop scanning the
 		 * smaller below, this makes sure that we only make one nudge
 		 * towards proportionality once we've got nr_to_reclaim.
-		 */
+		 */ // 남은 양이 없는 경우
 		if (!nr_file || !nr_anon)
 			break;
-
+		// scan_target : inactive, active를 합친 전체 페이지 수, nr_anon or nr_file : 현재까지 스캔한 페이지 수
 		if (nr_file > nr_anon) {
 			unsigned long scan_target = targets[LRU_INACTIVE_ANON] +
 						targets[LRU_ACTIVE_ANON] + 1;
@@ -2543,10 +2543,10 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 		/*
 		 * Recalculate the other LRU scan count based on its original
 		 * scan target and the percentage scanning already complete
-		 */
+		 */ // file와 anon 중에서 작은 쪽의 nr[lru]에 대해서 조정한다
 		lru = (lru == LRU_FILE) ? LRU_BASE : LRU_FILE;
-		nr_scanned = targets[lru] - nr[lru];
-		nr[lru] = targets[lru] * (100 - percentage) / 100;
+		nr_scanned = targets[lru] - nr[lru]; // get_scan_count에서 계산된 원본값(targets)와 여기서 줄여나가던 값(nr)의 차이
+		nr[lru] = targets[lru] * (100 - percentage) / 100; // 해당 lru에 대해서 더이상 shrink_list(위)를 안하는 경우 
 		nr[lru] -= min(nr[lru], nr_scanned);
 
 		lru += LRU_ACTIVE;
@@ -2678,7 +2678,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 		nr_reclaimed = sc->nr_reclaimed;
 		nr_scanned = sc->nr_scanned;
 
-		memcg = mem_cgroup_iter(root, NULL, &reclaim);
+		memcg = mem_cgroup_iter(root, NULL, &reclaim); // root부터 하위 memcgroup들을 순회
 		do {
 			unsigned long lru_pages;
 			unsigned long reclaimed;
@@ -2713,7 +2713,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			shrink_node_memcg(pgdat, memcg, sc, &lru_pages);
 			node_lru_pages += lru_pages;
 
-			if (sc->may_shrinkslab) {
+			if (sc->may_shrinkslab) { // 슬랩의 shrink를 요청한 경우
 				shrink_slab(sc->gfp_mask, pgdat->node_id,
 				    memcg, sc->priority);
 			}
@@ -2733,7 +2733,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			 * whole hierarchy is not sufficient.
 			 */
 			if (!current_is_kswapd() &&
-					sc->nr_reclaimed >= sc->nr_to_reclaim) {
+					sc->nr_reclaimed >= sc->nr_to_reclaim) { // kswap회수가 아니고 목표한 reclaim을 달성한 경우
 				mem_cgroup_iter_break(root, memcg);
 				break;
 			}
@@ -2750,7 +2750,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			   sc->nr_reclaimed - nr_reclaimed);
 
 		if (sc->nr_reclaimed - nr_reclaimed)
-			reclaimable = true;
+			reclaimable = true; // 순회 중에 한 번이라도 회수한 페이지의 변화가 있는 경우 reclimable을 true로 설정
 
 		if (current_is_kswapd()) {
 			/*
@@ -2798,7 +2798,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 		/*
 		 * Legacy memcg will stall in page writeback so avoid forcibly
 		 * stalling in wait_iff_congested().
-		 */
+		 */ // 글로벌 회수가 아니고, 지정된 memcg를 사용하지 않으면서 writeback으로 인해 지연되는 경우
 		if (!global_reclaim(sc) && sane_reclaim(sc) &&
 		    sc->nr.dirty && sc->nr.dirty == sc->nr.congested)
 			set_memcg_congestion(pgdat, root, true);
@@ -2808,7 +2808,7 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 		 * and node is congested. Allow kswapd to continue until it
 		 * starts encountering unqueued dirty pages or cycling through
 		 * the LRU too quickly.
-		 */
+		 */ // direct-reclaim 중 memcg 노드가 혼잡한 경우
 		if (!sc->hibernation_mode && !current_is_kswapd() &&
 		   current_may_throttle() && pgdat_memcg_congested(pgdat, root))
 			wait_iff_congested(BLK_RW_ASYNC, HZ/10);
