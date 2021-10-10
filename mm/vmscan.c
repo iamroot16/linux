@@ -3363,7 +3363,7 @@ static bool pgdat_watermark_boosted(pg_data_t *pgdat, int classzone_idx)
 /*
  * Returns true if there is an eligible zone balanced for the request order
  * and classzone_idx
- */
+ */ // high watermark를 만족하는 zone이 하나라도 있으면 true를 리턴
 static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 {
 	int i;
@@ -3509,7 +3509,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
 		.order = order,
-		.may_unmap = 1,
+		.may_unmap = 1, // 매핑된 페이지를 언맵
 	};
 
 	psi_memstall_enter(&pflags);
@@ -3521,7 +3521,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	 * Account for the reclaim boost. Note that the zone boost is left in
 	 * place so that parallel allocations that are near the watermark will
 	 * stall or direct reclaim until kswapd is finished.
-	 */
+	 */ // 존들을 순회하며 워터마크 부스트 값을 합산
 	nr_boost_reclaim = 0;
 	for (i = 0; i <= classzone_idx; i++) {
 		zone = pgdat->node_zones + i;
@@ -3534,7 +3534,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	boosted = nr_boost_reclaim;
 
 restart:
-	sc.priority = DEF_PRIORITY;
+	sc.priority = DEF_PRIORITY; // 가장 낮은 우선순위
 	do {
 		unsigned long nr_reclaimed = sc.nr_reclaimed;
 		bool raise_priority = true;
@@ -3581,10 +3581,10 @@ restart:
 		 * If boosting is not active then only reclaim if there are no
 		 * eligible zones. Note that sc.reclaim_idx is not used as
 		 * buffer_heads_over_limit may have adjusted it.
-		 */
+		 */ // 노드가 이미 밸런스 상태이고 부스트 중이 아니면 더이상 페이지 확보를 할 필요 없음
 		if (!nr_boost_reclaim && balanced)
 			goto out;
-
+		// 부스트 중에는 priority가 낮은 순위(12~10)는 상관없지만 높은 순위(9~1)부터는 더 이상 우선 순위가 높아지지 않도록 raise_priority에 false를 대입
 		/* Limit the priority of boosting to avoid reclaim writeback */
 		if (nr_boost_reclaim && sc.priority == DEF_PRIORITY - 2)
 			raise_priority = false;
@@ -3633,10 +3633,10 @@ restart:
 		 * If the low watermark is met there is no need for processes
 		 * to be throttled on pfmemalloc_wait as they should not be
 		 * able to safely make forward progress. Wake them
-		 */
+		 */ // throttle_direct_reclaim()에 의해 페이지 할당 중 메모리가 부족하여 direct reclaim 시도 중 대기하고 있는 태스크들이 pfmemalloc_wait 리스트에서 wait하는 경우
 		if (waitqueue_active(&pgdat->pfmemalloc_wait) &&
-				allow_direct_reclaim(pgdat))
-			wake_up_all(&pgdat->pfmemalloc_wait);
+				allow_direct_reclaim(pgdat)) // 노드가 direct reclaim을 해도 된다고 판단
+			wake_up_all(&pgdat->pfmemalloc_wait); // 대기 중인 태스크들을 모두 깨운다 -> throttle_direct_reclaim()에서 깨어난다
 
 		/* Check if kswapd should be suspending */
 		__fs_reclaim_release();
@@ -3727,7 +3727,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 	if (freezing(current) || kthread_should_stop())
 		return;
 
-	prepare_to_wait(&pgdat->kswapd_wait, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(&pgdat->kswapd_wait, &wait, TASK_INTERRUPTIBLE); // 현재 태스크를 kswapd_wait에 추가하여 sleep할 준비
 
 	/*
 	 * Try to sleep for a short interval. Note that kcompactd will only be
@@ -3751,14 +3751,14 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 		 */
 		wakeup_kcompactd(pgdat, alloc_order, classzone_idx);
 
-		remaining = schedule_timeout(HZ/10);
+		remaining = schedule_timeout(HZ/10); // 0.1초 sleep
 
 		/*
 		 * If woken prematurely then reset kswapd_classzone_idx and
 		 * order. The values will either be from a wakeup request or
 		 * the previous request that slept prematurely.
 		 */
-		if (remaining) {
+		if (remaining) { // 중간에 깬 경우 노드에 kswapd가 처리중인 zone과 order를 기록
 			pgdat->kswapd_classzone_idx = kswapd_classzone_idx(pgdat, classzone_idx);
 			pgdat->kswapd_order = max(pgdat->kswapd_order, reclaim_order);
 		}
@@ -3770,7 +3770,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 	/*
 	 * After a short sleep, check if it was a premature sleep. If not, then
 	 * go fully to sleep until explicitly woken up.
-	 */
+	 */ // 중간에 깨어나지 않고 0.1초를 완전히 슬립하였고, 여전히 요청 zone 까지 그리고 요청 order에 대해 free 페이지가 확보되어 밸런스된 high 워터마크 기준을 충족하면
 	if (!remaining &&
 	    prepare_kswapd_sleep(pgdat, reclaim_order, classzone_idx)) {
 		trace_mm_vmscan_kswapd_sleep(pgdat->node_id);
@@ -3782,14 +3782,14 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 		 * watermarks being breached while under pressure, we reduce the
 		 * per-cpu vmstat threshold while kswapd is awake and restore
 		 * them before going back to sleep.
-		 */
+		 */ //  per-cpu 스레졸드 값으로 normal 스레졸드 값을  사용
 		set_pgdat_percpu_threshold(pgdat, calculate_normal_threshold);
 
 		if (!kthread_should_stop())
-			schedule();
-
+			schedule(); // 현재 프로세스가 TASK_INTERRUPTIBLE로 바뀌고 wait한다
+		//  per-cpu 스레졸드 값으로 pressure한 스레졸드 값을  사용
 		set_pgdat_percpu_threshold(pgdat, calculate_pressure_threshold);
-	} else {
+	} else { // 슬립하자마자 깨어났는데, 메모리 부족 상황이 빠르게 온 경우 
 		if (remaining)
 			count_vm_event(KSWAPD_LOW_WMARK_HIT_QUICKLY);
 		else
@@ -3810,7 +3810,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
  *
  * If there are applications that are active memory-allocators
  * (most normal use), this basically shouldn't matter.
- */
+ */ // 각 노드에서 동작하는 zone에 대해 free 페이지가 low 워터마크 이하로 내려가는 경우 백그라운드에서 페이지 회수를 진행하고 high 워터마크 이상이 되는 경우 페이지 회수를 멈춘다.
 static int kswapd(void *p)
 {
 	unsigned int alloc_order, reclaim_order;
@@ -3838,9 +3838,9 @@ static int kswapd(void *p)
 	 * page out something else, and this flag essentially protects
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
-	 */
+	 */ // per process flag (워터마크 제한없이 메모리 할당 + swap기록요청 + kswapd task)
 	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
-	set_freezable();
+	set_freezable(); // 현재 태스크를 freeze(정지)할 수 있도록 PF_NOFREEZE 플래그를 제거
 
 	pgdat->kswapd_order = 0;
 	pgdat->kswapd_classzone_idx = MAX_NR_ZONES;
@@ -3860,15 +3860,15 @@ kswapd_try_sleep:
 		pgdat->kswapd_order = 0;
 		pgdat->kswapd_classzone_idx = MAX_NR_ZONES;
 
-		ret = try_to_freeze();
-		if (kthread_should_stop())
+		ret = try_to_freeze(); // 현재 태스크 kswapd에 대해 freeze 요청이 있는 경우 freeze 시도 
+		if (kthread_should_stop()) // 현재 태스크의 KTHREAD_SHOULD_STOP 플래그 비트가 설정된 경우 루프를 탈출하고 스레드 종료
 			break;
 
 		/*
 		 * We can speed up thawing tasks if we don't call balance_pgdat
 		 * after returning from the refrigerator
 		 */
-		if (ret)
+		if (ret) // freeze 된 적이 있으면 빠른 처리를 위해 노드 밸런스를 동작시키지 않고 계속 진행
 			continue;
 
 		/*
@@ -3882,7 +3882,7 @@ kswapd_try_sleep:
 		trace_mm_vmscan_kswapd_wake(pgdat->node_id, classzone_idx,
 						alloc_order);
 		reclaim_order = balance_pgdat(pgdat, alloc_order, classzone_idx);
-		if (reclaim_order < alloc_order)
+		if (reclaim_order < alloc_order) // 요청한 order보다 reclaim된 order가 작은경우, 해당존의 0 order 에서 시작
 			goto kswapd_try_sleep;
 	}
 

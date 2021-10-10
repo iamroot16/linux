@@ -2569,7 +2569,7 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 			 * otherwise coalesce on the zone's free area for
 			 * order >= cc.order.  This is ratelimited by the
 			 * upcoming deferral.
-			 */
+			 */ // 원하는 order가 없는 경우 per-cpu 캐시를 회수하고(높은 order를 compaction할 확률이 증가), 유예 한도를 증가
 			drain_all_pages(zone);
 
 			/*
@@ -2639,12 +2639,12 @@ static int kcompactd(void *p)
 	if (!cpumask_empty(cpumask))
 		set_cpus_allowed_ptr(tsk, cpumask);
 
-	set_freezable();
+	set_freezable(); // 태스크를 freeze할 수 있도록 PF_NOFREEZE 플래그를 제거
 
 	pgdat->kcompactd_max_order = 0;
 	pgdat->kcompactd_classzone_idx = pgdat->nr_zones - 1;
 
-	while (!kthread_should_stop()) {
+	while (!kthread_should_stop()) { // 종료 요청이 없는 한 계속 루프를 돌며 슬립한 후 외부 요청에 의해 깨어나면 compaction
 		unsigned long pflags;
 
 		trace_mm_compaction_kcompactd_sleep(pgdat->node_id);

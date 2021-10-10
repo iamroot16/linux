@@ -2787,7 +2787,7 @@ static void drain_local_pages_wq(struct work_struct *work)
  * When zone parameter is non-NULL, spill just the single zone's pages.
  *
  * Note that this can be extremely slow as the draining happens in a workqueue.
- */
+ */ // 모든 per cpu page를 버디할당자로 돌려보낸다
 void drain_all_pages(struct zone *zone)
 {
 	int cpu;
