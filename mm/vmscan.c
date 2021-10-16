@@ -3556,7 +3556,7 @@ restart:
 		if (buffer_heads_over_limit) {
 			for (i = MAX_NR_ZONES - 1; i >= 0; i--) {
 				zone = pgdat->node_zones + i;
-				if (!managed_zone(zone))
+				if (!managed_zone(zone)) // 
 					continue;
 
 				sc.reclaim_idx = i;
@@ -3571,7 +3571,7 @@ restart:
 		 * on the grounds that the normal reclaim should be enough to
 		 * re-evaluate if boosting is required when kswapd next wakes.
 		 */
-		balanced = pgdat_balanced(pgdat, sc.order, classzone_idx);
+		balanced = pgdat_balanced(pgdat, sc.order, classzone_idx); // zone 
 		if (!balanced && nr_boost_reclaim) {
 			nr_boost_reclaim = 0;
 			goto restart;
@@ -3618,7 +3618,7 @@ restart:
 		sc.nr_scanned = 0;
 		nr_soft_scanned = 0;
 		nr_soft_reclaimed = mem_cgroup_soft_limit_reclaim(pgdat, sc.order,
-						sc.gfp_mask, &nr_soft_scanned);
+						sc.gfp_mask, &nr_soft_scanned); // sc.gfp_mask == GFP_KERNEL
 		sc.nr_reclaimed += nr_soft_reclaimed;
 
 		/*

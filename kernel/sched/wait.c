@@ -229,7 +229,7 @@ prepare_to_wait(struct wait_queue_head *wq_head, struct wait_queue_entry *wq_ent
 	wq_entry->flags &= ~WQ_FLAG_EXCLUSIVE;
 	spin_lock_irqsave(&wq_head->lock, flags);
 	if (list_empty(&wq_entry->entry))
-		__add_wait_queue(wq_head, wq_entry);
+		__add_wait_queue(wq_head, wq_entry); // prepare_to_wait() 하나만 처리하자?
 	set_current_state(state);
 	spin_unlock_irqrestore(&wq_head->lock, flags);
 }
