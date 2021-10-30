@@ -3839,7 +3839,7 @@ static int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */ // per process flag (워터마크 제한없이 메모리 할당 + swap기록요청 + kswapd task)
-	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
+	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD; // PF_MEMALLOC -> but sometimes you need a small amount of memory
 	set_freezable(); // 현재 태스크를 freeze(정지)할 수 있도록 PF_NOFREEZE 플래그를 제거
 
 	pgdat->kswapd_order = 0;
