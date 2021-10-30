@@ -950,7 +950,7 @@ struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *root,
 			goto out_unlock;
 
 		while (1) {
-			pos = READ_ONCE(iter->position);
+			pos = READ_ONCE(iter->position); // mem_cgroup pos
 			if (!pos || css_tryget(&pos->css))
 				break;
 			/*
@@ -961,7 +961,7 @@ struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *root,
 			 * might block it. So we clear iter->position right
 			 * away.
 			 */
-			(void)cmpxchg(&iter->position, pos, NULL);
+			(void)cmpxchg(&iter->position, pos, NULL); // cmpxchg(작동시킬 주소, 해당 주소의 값과 비교할 값, 비교된 값이 같다면 넣을 새 값);
 		}
 	}
 
