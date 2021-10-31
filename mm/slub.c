@@ -304,7 +304,7 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	BUG_ON(object == fp); /* naive detection of double free or corruption */
 #endif
-
+	// 다음 object를 가리키도록 설정
 	*(void **)freeptr_addr = freelist_ptr(s, fp, freeptr_addr);
 }
 
@@ -1616,7 +1616,7 @@ static inline bool shuffle_freelist(struct kmem_cache *s, struct page *page)
 #endif /* CONFIG_SLAB_FREELIST_RANDOM */
 
 static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
-{
+{// 모든 free object들을 순서대로 연결하고 마지막 object의 연결은 null로 한다
 	struct page *page;
 	struct kmem_cache_order_objects oo = s->oo;
 	gfp_t alloc_gfp;
@@ -1639,8 +1639,8 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if ((alloc_gfp & __GFP_DIRECT_RECLAIM) && oo_order(oo) > oo_order(s->min))
 		alloc_gfp = (alloc_gfp | __GFP_NOMEMALLOC) & ~(__GFP_RECLAIM|__GFP_NOFAIL);
 
-	page = alloc_slab_page(s, alloc_gfp, node, oo);
-	if (unlikely(!page)) {
+	page = alloc_slab_page(s, alloc_gfp, node, oo); // s->oo로 버디시스템으로 부터 슬랩 페이지를 할당
+	if (unlikely(!page)) { // 실패하는 경우 s->min으로 order를 줄여서 슬랩 페이지를 할당
 		oo = s->min;
 		alloc_gfp = flags;
 		/*
@@ -1652,13 +1652,13 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 			goto out;
 		stat(s, ORDER_FALLBACK);
 	}
-
+	// 슬랩 페이지의 page 디스크립터를 초기화
 	page->objects = oo_objects(oo);
 
 	order = compound_order(page);
 	page->slab_cache = s;
 	__SetPageSlab(page);
-	if (page_is_pfmemalloc(page))
+	if (page_is_pfmemalloc(page)) // low 워터마크 기준 아래에 도달한 경우에도 ALLOC_NO_WATERMARKS 플래그를 사용하여 페이지를 확보
 		SetPageSlabPfmemalloc(page);
 
 	kasan_poison_slab(page);
@@ -1670,20 +1670,20 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	shuffle = shuffle_freelist(s, page);
 
 	if (!shuffle) {
-		start = fixup_red_left(s, start);
+		start = fixup_red_left(s, start); // red-zone을 사용한 경우 red_left_pad 만큼 object 주소를 이동시켜 반환
 		start = setup_object(s, page, start);
 		page->freelist = start;
 		for (idx = 0, p = start; idx < page->objects - 1; idx++) {
 			next = p + s->size;
 			next = setup_object(s, page, next);
-			set_freepointer(s, p, next);
+			set_freepointer(s, p, next); // freepointer가 다음 object를 가리키도록 한다
 			p = next;
 		}
 		set_freepointer(s, p, NULL);
 	}
 
 	page->inuse = page->objects;
-	page->frozen = 1;
+	page->frozen = 1; // 슬랩 페이지가 특정 cpu가 전용으로 사용할 수 있는 상태 (percpu : 1, node : 0)
 
 out:
 	if (gfpflags_allow_blocking(flags))
@@ -3365,7 +3365,7 @@ static void early_kmem_cache_node_alloc(int node)
 	struct kmem_cache_node *n;
 
 	BUG_ON(kmem_cache_node->size < sizeof(struct kmem_cache_node));
-
+	// slub 시스템이 아직 동작하지 않아 slub object로 할당을 받지 못하므로 버디 시스템으로 부터 페이지를 할당 받아 슬랩 페이지로 구성한다.
 	page = new_slab(kmem_cache_node, GFP_NOWAIT, node);
 
 	BUG_ON(!page);
@@ -3385,7 +3385,7 @@ static void early_kmem_cache_node_alloc(int node)
 	page->freelist = get_freepointer(kmem_cache_node, n);
 	page->inuse = 1;
 	page->frozen = 0;
-	kmem_cache_node->node[node] = n;
+	kmem_cache_node->node[node] = n; // 첫번째 slub object를 kmem cache의 노드로 사용
 	init_kmem_cache_node(n);
 	inc_slabs_node(kmem_cache_node, node, page->objects);
 
@@ -3421,7 +3421,7 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 	for_each_node_state(node, N_NORMAL_MEMORY) {
 		struct kmem_cache_node *n;
 
-		if (slab_state == DOWN) {
+		if (slab_state == DOWN) { // 첫부팅시에 초기화 하는 경우
 			early_kmem_cache_node_alloc(node);
 			continue;
 		}
@@ -3607,13 +3607,13 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 }
 
 static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
-{
+{	// ”slab_debug=” 커널 파라메터에 의해 몇 개의 디버그 요청이 있는 경우 object를 만들 때 반영하기 위해 해당 기능의 slub 디버그 플래그를 추가
 	s->flags = kmem_cache_flags(s->size, flags, s->name, s->ctor);
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	s->random = get_random_long();
 #endif
 
-	if (!calculate_sizes(s, -1))
+	if (!calculate_sizes(s, -1)) // 객체 size에 따른 order 및 객체 수 등이 산출
 		goto error;
 	if (disable_higher_order_debug) {
 		/*
@@ -3638,7 +3638,7 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 	/*
 	 * The larger the object size is, the more pages we want on the partial
 	 * list to avoid pounding the page allocator excessively.
-	 */
+	 */ // object의 size를 표현하는데 필요한 비트 수의 절반 (size 4k -> 12/2 = 6)
 	set_min_partial(s, ilog2(s->size) / 2);
 
 	set_cpu_partial(s);
@@ -4238,7 +4238,7 @@ void __init kmem_cache_init(void)
 
 	kmem_cache_node = &boot_kmem_cache_node;
 	kmem_cache = &boot_kmem_cache;
-
+	// 부트 타임용 “kmem_cache_node” 슬랩 캐시를 캐시 라인에 정렬하게 준비 (slab_state : DOWN)
 	create_boot_cache(kmem_cache_node, "kmem_cache_node",
 		sizeof(struct kmem_cache_node), SLAB_HWCACHE_ALIGN, 0, 0);
 
@@ -4246,8 +4246,8 @@ void __init kmem_cache_init(void)
 
 	/* Able to allocate the per node structures */
 	slab_state = PARTIAL;
-
-	create_boot_cache(kmem_cache, "kmem_cache",
+	// 부트 타임용 “kmem_cache” 슬랩 캐시를 캐시 라인에 정렬하게 준비
+	create_boot_cache(kmem_cache, "kmem_cache", // kmem_cache_node 에서 nr_node_ids 노드수 만큼 포인터의 배열을 가지고 있는 kmem_cache 구조체의 메모리를 할당
 			offsetof(struct kmem_cache, node) +
 				nr_node_ids * sizeof(struct kmem_cache_node *),
 		       SLAB_HWCACHE_ALIGN, 0, 0);
