@@ -1616,7 +1616,7 @@ static inline bool shuffle_freelist(struct kmem_cache *s, struct page *page)
 #endif /* CONFIG_SLAB_FREELIST_RANDOM */
 
 static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
-{// 모든 free object들을 순서대로 연결하고 마지막 object의 연결은 null로 한다
+{// slub 페이지 할당을 받고 그 페이지에 포함된 free object의 초기화를 수행
 	struct page *page;
 	struct kmem_cache_order_objects oo = s->oo;
 	gfp_t alloc_gfp;
@@ -1629,7 +1629,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if (gfpflags_allow_blocking(flags))
 		local_irq_enable();
 
-	flags |= s->allocflags;
+	flags |= s->allocflags; // calculate_sizes() 에서 설정한 flags (ex __GFP_COMP : compound 페이지)
 
 	/*
 	 * Let the initial higher-order allocation fail under memory pressure
@@ -1640,7 +1640,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		alloc_gfp = (alloc_gfp | __GFP_NOMEMALLOC) & ~(__GFP_RECLAIM|__GFP_NOFAIL);
 
 	page = alloc_slab_page(s, alloc_gfp, node, oo); // s->oo로 버디시스템으로 부터 슬랩 페이지를 할당
-	if (unlikely(!page)) { // 실패하는 경우 s->min으로 order를 줄여서 슬랩 페이지를 할당
+	if (unlikely(!page)) { // 실패하는 경우 s->min으로 order를 줄여서 다시 할당 시도
 		oo = s->min;
 		alloc_gfp = flags;
 		/*
@@ -1652,13 +1652,13 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 			goto out;
 		stat(s, ORDER_FALLBACK);
 	}
-	// 슬랩 페이지의 page 디스크립터를 초기화
+
 	page->objects = oo_objects(oo);
 
 	order = compound_order(page);
-	page->slab_cache = s;
+	page->slab_cache = s; // 페이지의 slab_cache가 kmem_cache를 가리킴
 	__SetPageSlab(page);
-	if (page_is_pfmemalloc(page)) // low 워터마크 기준 아래에 도달한 경우에도 ALLOC_NO_WATERMARKS 플래그를 사용하여 페이지를 확보
+	if (page_is_pfmemalloc(page)) // PF_MEMALLOC : low 워터마크 기준 아래에 도달한 경우에도 ALLOC_NO_WATERMARKS 플래그를 사용하여 비상용 페이지를 확보
 		SetPageSlabPfmemalloc(page);
 
 	kasan_poison_slab(page);
@@ -1673,13 +1673,13 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		start = fixup_red_left(s, start); // red-zone을 사용한 경우 red_left_pad 만큼 object 주소를 이동시켜 반환
 		start = setup_object(s, page, start);
 		page->freelist = start;
-		for (idx = 0, p = start; idx < page->objects - 1; idx++) {
+		for (idx = 0, p = start; idx < page->objects - 1; idx++) { // 각 free slab object를 freepointer로 linkedlist처럼 연결
 			next = p + s->size;
 			next = setup_object(s, page, next);
-			set_freepointer(s, p, next); // freepointer가 다음 object를 가리키도록 한다
+			set_freepointer(s, p, next);
 			p = next;
 		}
-		set_freepointer(s, p, NULL);
+		set_freepointer(s, p, NULL); // 마지막 free slab object의 freepointer는 null을 가리킨다
 	}
 
 	page->inuse = page->objects;
@@ -1818,10 +1818,10 @@ static inline void *acquire_slab(struct kmem_cache *s,
 	counters = page->counters;
 	new.counters = counters;
 	*objects = new.objects - new.inuse;
-	if (mode) {
+	if (mode) { // 슬랩 페이지를 c->page로 이동, 슬랩 페이지의 모든 free object들도 사용중인 상태로 변경 (첫번째)
 		new.inuse = page->objects;
 		new.freelist = NULL;
-	} else {
+	} else { // 슬랩 페이지를 c->partial 리스트로 이동 (나머지)
 		new.freelist = freelist;
 	}
 
@@ -1858,7 +1858,7 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
 	 * just allocate an empty slab. If we mistakenly try to get a
 	 * partial slab and there is none available then get_partials()
 	 * will return NULL.
-	 */
+	 */ // per 노드의 슬랩 페이지 수가 0이된 경우
 	if (!n || !n->nr_partial)
 		return NULL;
 
@@ -1868,7 +1868,7 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
 
 		if (!pfmemalloc_match(page, flags))
 			continue;
-
+		// 첫 슬랩 페이지를 가져온 경우 per cpu 캐시의 page로 이동
 		t = acquire_slab(s, n, page, object == NULL, &objects);
 		if (!t)
 			break;
@@ -1878,7 +1878,7 @@ static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
 			c->page = page;
 			stat(s, ALLOC_FROM_PARTIAL);
 			object = t;
-		} else {
+		} else { // 두 번째 슬랩 페이지부터 per cpu 캐시의 partial 리스트로 이동
 			put_cpu_partial(s, page, 0);
 			stat(s, CPU_PARTIAL_NODE);
 		}
@@ -2460,12 +2460,12 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
 
 	WARN_ON_ONCE(s->ctor && (flags & __GFP_ZERO));
 
-	freelist = get_partial(s, flags, node, c);
+	freelist = get_partial(s, flags, node, c); // 3단계 : n->partial –> c->page, c->freelist, c->partial
 
 	if (freelist)
 		return freelist;
 
-	page = new_slab(s, flags, node);
+	page = new_slab(s, flags, node); // 버디 시스템으로 부터 할당 받아 c->page & c->freelist로
 	if (page) {
 		c = raw_cpu_ptr(s->cpu_slab);
 		if (c->page)
@@ -2518,12 +2518,12 @@ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
 		VM_BUG_ON(!new.frozen);
 
 		new.inuse = page->objects;
-		new.frozen = freelist != NULL;
+		new.frozen = freelist != NULL; // free object가 있는 경우 frozen (per cpu)
 
-	} while (!__cmpxchg_double_slab(s, page,
+	} while (!__cmpxchg_double_slab(s, page, // per cpu 캐시
 		freelist, counters,
 		NULL, new.counters,
-		"get_freelist"));
+		"get_freelist")); // page->freelist = NULL, page->counters = new.counters
 
 	return freelist;
 }
@@ -2558,12 +2558,12 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 		goto new_slab;
 redo:
 
-	if (unlikely(!node_match(page, node))) {
+	if (unlikely(!node_match(page, node))) { // c->page의 노드와 인수로 요청한 노드가 서로 다른 경우
 		int searchnode = node;
-
+		// 메모리리스 노드 구성일 수도 있으므로 c->page의 노드와 인접한 노드를 찾음
 		if (node != NUMA_NO_NODE && !node_present_pages(node))
 			searchnode = node_to_mem_node(node);
-
+		// 찾은 노드와 다시 한 번 비교
 		if (unlikely(!node_match(page, searchnode))) {
 			stat(s, ALLOC_NODE_MISMATCH);
 			deactivate_slab(s, page, c->freelist, c);
@@ -2575,7 +2575,7 @@ redo:
 	 * By rights, we should be searching for a slab page that was
 	 * PFMEMALLOC but right now, we are losing the pfmemalloc
 	 * information when the page leaves the per-cpu allocator
-	 */
+	 */ // 현재 요청으로 PF_MEMALLOC인 비상용 슬랩 페이지가 선택된 경우 (swap for NBD driver)
 	if (unlikely(!pfmemalloc_match(page, gfpflags))) {
 		deactivate_slab(s, page, c->freelist, c);
 		goto new_slab;
@@ -2583,13 +2583,13 @@ redo:
 
 	/* must check again c->freelist in case of cpu migration or IRQ */
 	freelist = c->freelist;
-	if (freelist)
+	if (freelist) // 다시 한 번 확인시, object가 있는경우
 		goto load_freelist;
-
-	freelist = get_freelist(s, page);
+	// 1단계 : per cpu의 c->page->freelist —(이동)—> c->freelist 로 refill
+	freelist = get_freelist(s, page); // c->page->freelist를 리턴
 
 	if (!freelist) {
-		c->page = NULL;
+		c->page = NULL; // 슬랩 할당자에서 해당 슬랩 페이지를 관리하지 않게한다
 		stat(s, DEACTIVATE_BYPASS);
 		goto new_slab;
 	}
@@ -2609,14 +2609,14 @@ load_freelist:
 
 new_slab:
 
-	if (slub_percpu_partial(c)) {
-		page = c->page = slub_percpu_partial(c);
+	if (slub_percpu_partial(c)) { // partial에 있으면 c->page으로 하나의 슬랩 페이지만 옮긴다
+		page = c->page = slub_percpu_partial(c); 
 		slub_set_percpu_partial(c, page);
 		stat(s, CPU_PARTIAL_ALLOC);
-		goto redo;
+		goto redo; // 2단계
 	}
 
-	freelist = new_slab_objects(s, gfpflags, node, &c);
+	freelist = new_slab_objects(s, gfpflags, node, &c); // 3,4 단계
 
 	if (unlikely(!freelist)) {
 		slab_out_of_memory(s, gfpflags, node);
@@ -2628,7 +2628,7 @@ new_slab:
 		goto load_freelist;
 
 	/* Only entered in the debug case */
-	if (kmem_cache_debug(s) &&
+	if (kmem_cache_debug(s) && // SLAB_CONSISTENCY_CHECKS 디버그 요청으로 consistency 체크에서 문제가 발견되는 경우
 			!alloc_debug_processing(s, page, freelist, addr))
 		goto new_slab;	/* Slab failed checks. Next slab needed */
 
@@ -2688,11 +2688,11 @@ redo:
 	 * enabled. We may switch back and forth between cpus while
 	 * reading from one cpu area. That does not matter as long
 	 * as we end up on the original cpu again when doing the cmpxchg.
-	 *
+	 * // 현재 이 시점에서 preemption이 언제라도 가능하기 때문에 수행 중 태스크 전환되었다 다시 돌아왔을 수 있다.
 	 * We should guarantee that tid and kmem_cache are retrieved on
 	 * the same cpu. It could be different if CONFIG_PREEMPT so we need
 	 * to check if it is matched or not.
-	 */
+	 */ // tid와 슬랩캐시를 획득한 cpu와가 같은 cpu에서 획득된 것을 보장하게 하기 위해 확인
 	do {
 		tid = this_cpu_read(s->cpu_slab->tid);
 		c = raw_cpu_ptr(s->cpu_slab);
@@ -2706,7 +2706,7 @@ redo:
 	 * won't be used with current tid. If we fetch tid first, object and
 	 * page could be one associated with next tid and our alloc/free
 	 * request will be failed. In this case, we will retry. So, no problem.
-	 */
+	 */ // object와 page보다 먼저 tid를 읽기 위해 컴파일러로 하여금 optimization을 하지 않도록 한다.
 	barrier();
 
 	/*
@@ -2715,14 +2715,14 @@ redo:
 	 * occurs on the right processor and that there was no operation on the
 	 * linked list in between.
 	 */
-
+	// per cpu 캐시의 freelist에서 object를 받아오고 page도 받아온다
 	object = c->freelist;
 	page = c->page;
-	if (unlikely(!object || !node_match(page, node))) {
-		object = __slab_alloc(s, gfpflags, node, addr, c);
+	if (unlikely(!object || !node_match(page, node))) { // 할당할 슬랩 object가 없거나 현재 per cpu 캐시에서 알아온 슬랩 page의 노드가 지정된 노드와 다른 경우 
+		object = __slab_alloc(s, gfpflags, node, addr, c); // slow path
 		stat(s, ALLOC_SLOWPATH);
-	} else {
-		void *next_object = get_freepointer_safe(s, object);
+	} else { // fast path
+		void *next_object = get_freepointer_safe(s, object); // freepoint가 가리키는 다음 슬랩 object의 주소
 
 		/*
 		 * The cmpxchg will only match if there was no additional
@@ -2737,12 +2737,12 @@ redo:
 		 * Since this is without lock semantics the protection is only
 		 * against code executing on this cpu *not* from access by
 		 * other cpus.
-		 */
+		 */ // freelist와 object, 두tid가 동일하면 next로 atomic하게 바꿈
 		if (unlikely(!this_cpu_cmpxchg_double(
 				s->cpu_slab->freelist, s->cpu_slab->tid,
 				object, tid,
 				next_object, next_tid(tid)))) {
-
+			// 태스크가 preemption되었다가 다른 노드의 cpu에서 스케쥴되어 재개한 경우, cpu가 변경되었거나 다른 리모트 cpu에 의해 트랜잭션 id가 달라짐
 			note_cmpxchg_failure("slab_alloc", s, tid);
 			goto redo;
 		}
@@ -3358,7 +3358,7 @@ static struct kmem_cache *kmem_cache_node;
  * Note that this function only works on the kmem_cache_node
  * when allocating for the kmem_cache_node. This is used for bootstrapping
  * memory on a fresh node that has no slab structures yet.
- */
+ */ // 초기 슬랩 시스템이 하나도 가동되지 않은 상태인 경우에만 사용
 static void early_kmem_cache_node_alloc(int node)
 {
 	struct page *page;
@@ -3385,14 +3385,14 @@ static void early_kmem_cache_node_alloc(int node)
 	page->freelist = get_freepointer(kmem_cache_node, n);
 	page->inuse = 1;
 	page->frozen = 0;
-	kmem_cache_node->node[node] = n; // 첫번째 slub object를 kmem cache의 노드로 사용
-	init_kmem_cache_node(n);
+	kmem_cache_node->node[node] = n; // 노드 1개에 대해 첫번째 슬랩 object연결
+	init_kmem_cache_node(n); 
 	inc_slabs_node(kmem_cache_node, node, page->objects);
 
 	/*
 	 * No locks need to be taken here as it has just been
 	 * initialized and there is no concurrent access.
-	 */
+	 */ // partial 리스트의 head에 슬랩페이지 추가
 	__add_partial(n, page, DEACTIVATE_TO_HEAD);
 }
 
@@ -3584,7 +3584,7 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 
 	s->allocflags = 0;
 	if (order)
-		s->allocflags |= __GFP_COMP;
+		s->allocflags |= __GFP_COMP; // order가 0이 아닌경우 슬랩캐시는 compound 페이지로 관리
 
 	if (s->flags & SLAB_CACHE_DMA)
 		s->allocflags |= GFP_DMA;
@@ -3638,7 +3638,7 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 	/*
 	 * The larger the object size is, the more pages we want on the partial
 	 * list to avoid pounding the page allocator excessively.
-	 */ // object의 size를 표현하는데 필요한 비트 수의 절반 (size 4k -> 12/2 = 6)
+	 */ // object의 size를 표현하는데 필요한 비트 수의 절반 (size 4k(=2^12) -> 12/2 = 6, 5~10사이로 조절)
 	set_min_partial(s, ilog2(s->size) / 2);
 
 	set_cpu_partial(s);
@@ -3653,13 +3653,13 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 			goto error;
 	}
 
-	if (!init_kmem_cache_nodes(s))
+	if (!init_kmem_cache_nodes(s)) // 슬랩캐시 할당
 		goto error;
 
-	if (alloc_kmem_cache_cpus(s))
-		return 0;
+	if (alloc_kmem_cache_cpus(s)) // per-cpu 슬랩 구조체 할당
+		return 0; // 슬랩캐시 할당 성공시 리턴
 
-	free_kmem_cache_nodes(s);
+	free_kmem_cache_nodes(s); // 슬랩캐시 할당 실패시, per 노드 해제
 error:
 	if (flags & SLAB_PANIC)
 		panic("Cannot create slab %s size=%u realsize=%u order=%u offset=%u flags=%lx\n",
