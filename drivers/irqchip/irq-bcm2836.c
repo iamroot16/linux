@@ -225,7 +225,13 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 	}
 
 	bcm2835_init_local_timer_frequency();
-
+	/**
+	 * @brief include/linux/irqchip/irq-bcm2836.h
+	 *
+	 * #define LOCAL_IRQ_PMU_FAST	9
+	 * #define LAST_IRQ		LOCAL_IRQ_PMU_FAST
+	 * LAST_IRQ + 1 = 10
+	 */
 	intc.domain = irq_domain_add_linear(node, LAST_IRQ + 1,
 					    &bcm2836_arm_irqchip_intc_ops,
 					    NULL);

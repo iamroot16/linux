@@ -385,9 +385,9 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 	 * and should switch to the irq stack.
 	 */
 	ldr	x25, [tsk, TSK_STACK]
-	eor	x25, x25, x19
-	and	x25, x25, #~(THREAD_SIZE - 1)
-	cbnz	x25, 9998f
+	eor	x25, x25, x19 					// thread_info 현재 sp 비교해서 top bit 다르면 0, 1
+	and	x25, x25, #~(THREAD_SIZE - 1) 	// top bits 비교
+	cbnz	x25, 9998f 					// top bits 같으면 9998 분기없이 계속 코드 실행
 
 	ldr_this_cpu x25, irq_stack_ptr, x26
 	mov	x26, #IRQ_STACK_SIZE
@@ -395,7 +395,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 
 	/* switch to the irq stack */
 	mov	sp, x26
-9998:
+9998: # 다르면 9998
 	.endm
 
 	/*
