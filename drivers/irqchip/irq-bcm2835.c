@@ -136,10 +136,17 @@ static int __init armctrl_of_init(struct device_node *node,
 	void __iomem *base;
 	int irq, b, i;
 
-	base = of_iomap(node, 0);
+	base = of_iomap(node, 0); // Returns a pointer to the mapped memory
 	if (!base)
 		panic("%pOF: unable to map IC registers\n", node);
 
+	/**
+	 * 
+	 * @brief MAKE_HWIRQ(NR_BANKS, 0)
+	 * #define MAKE_HWIRQ(b, n)	((b << 5) | (n))
+	 * NR_BANKS = 3
+	 * 3^5 = 243
+	 */
 	intc.domain = irq_domain_add_linear(node, MAKE_HWIRQ(NR_BANKS, 0),
 			&armctrl_ops, NULL);
 	if (!intc.domain)
@@ -151,6 +158,10 @@ static int __init armctrl_of_init(struct device_node *node,
 		intc.disable[b] = base + reg_disable[b];
 
 		for (i = 0; i < bank_irqs[b]; i++) {
+			/**
+			 * @brief MAKE_HWIRQ(b, i)
+			 * 
+			 */
 			irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i));
 			BUG_ON(irq <= 0);
 			irq_set_chip_and_handler(irq, &armctrl_chip,
